@@ -29,4 +29,15 @@ extern bool debug_mode;
  */
 void send(int &clock, int message, int tag, int receiverID, int senderID);
 
+/*
+ * Receive message from second monitor.
+ * @param int &clock - Lamport clock's reference
+ * @param int data[] - Array to insert received data
+ * @param MPI_Status &status - Status to update
+ * @param int tag - Message tag. Set -1 to receive all tags.
+ * @param int receiverID - ID of receiver process
+ * @param int senderID - ID of sender process
+ */
+void receive(int &clock, int data[], MPI_Status &status, int tag, int receiverID, int senderID);
+
 #endif

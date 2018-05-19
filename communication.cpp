@@ -56,3 +56,40 @@ void send(int &clock, int message, int tag, int receiverID, int senderID) {
   // Unlock mutex
   pthread_mutex_unlock(&clock_mutex);
 }
+
+/*
+ * Receive message from second monitor.
+ * @param int &clock - Lamport clock's reference
+ * @param int data[] - Array to insert received data
+ * @param MPI_Status &status - Status to update
+ * @param int tag - Message tag. Set -1 to receive all tags.
+ * @param int receiverID - ID of receiver process
+ * @param int senderID - ID of sender process
+ */
+void receive(int &clock, int data[], MPI_Status &status, int tag, int receiverID, int senderID) {
+  // Receive data
+  if(tag != -1) {
+    MPI_Recv(data, 2, MPI_INT, senderID, tag, MPI_COMM_WORLD, &status);
+  } else {
+    MPI_Recv(data, 2, MPI_INT, senderID, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+  }
+
+  // Lock mutex to enable modify Lamport clock value
+  pthread_mutex_lock(&clock_mutex);
+
+  // Check timer value
+  if(clock < data[0]) {
+    clock = data[0] + 1;
+  } else {
+    clock += 1;
+  }
+
+  // When enabled debug mode - show extra details
+  if (debug_mode) {
+    printf("[TIMER: %05d][PID: %02d][TAG: %03d] Receive '%d' from process %d.\n",
+           clock, receiverID, status.MPI_TAG, data[1], status.MPI_SOURCE);
+  }
+
+  // Unlock mutex
+  pthread_mutex_unlock(&clock_mutex);
+}

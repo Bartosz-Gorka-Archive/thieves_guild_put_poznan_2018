@@ -18,7 +18,18 @@ int main(int argc,char **argv)
     MPI_Comm_size( MPI_COMM_WORLD, &size );
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );
 
-    send(lamport_clock, 12, (232 * rank)+1, 0, rank);
+    if(rank != 0) {
+      send(lamport_clock, 12, TAG_FIND_PARTNER, 0, rank);
+    }
+
+    if(rank == 0) {
+      int reveived_data[2];
+      MPI_Status status;
+
+      for(int i = 1; i < size; i++) {
+        receive(lamport_clock, reveived_data, status, TAG_FIND_PARTNER, rank, i);
+      }
+    }
 
     MPI_Finalize();
 }
