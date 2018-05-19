@@ -40,4 +40,14 @@ void send(int &clock, int message, int tag, int receiverID, int senderID);
  */
 void receive(int &clock, int data[], MPI_Status &status, int tag, int receiverID, int senderID);
 
+/*
+ * Broadcast message to all another monitors.
+ * @param int &clock - Lamport clock's reference to value (required to bump +1 value)
+ * @param int message - Value to send
+ * @param int tag - Message tag
+ * @param int world_size - MPI_Comm_size value
+ * @param int senderID - ID of sender process
+ */
+void broadcast(int &clock, int message, int tag, int world_size, int senderID);
+
 #endif

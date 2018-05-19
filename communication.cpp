@@ -93,3 +93,18 @@ void receive(int &clock, int data[], MPI_Status &status, int tag, int receiverID
   // Unlock mutex
   pthread_mutex_unlock(&clock_mutex);
 }
+
+/*
+ * Broadcast message to all another monitors.
+ * @param int &clock - Lamport clock's reference to value (required to bump +1 value)
+ * @param int message - Value to send
+ * @param int tag - Message tag
+ * @param int world_size - MPI_Comm_size value
+ * @param int senderID - ID of sender process
+ */
+void broadcast(int &clock, int message, int tag, int world_size, int senderID) {
+  // Loop to send message to another monitors
+  for(int i = 0; i < world_size; i++) {
+    send(clock, message, tag, i, senderID);
+  }
+}
