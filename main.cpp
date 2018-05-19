@@ -1,17 +1,14 @@
-#include <stdlib.h>
-#include <stdio.h>
 #include <mpi.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
 
-#define TAG_FIND_COLABORATOR 10
-#define TAG_FIND_TABLE 20
+#include "tags.h"
+#include "communication.h"
 
-MPI_Datatype MPI_PAKIET_T;
-
-typedef struct message_s {
-  int pid; // Process PID
-  long time_value; // Lamport's Timer value
-  int data; // Message value
-} message;
+pthread_mutex_t clock_mutex = PTHREAD_MUTEX_INITIALIZER;
+bool debug_mode = true;
+int lamport_clock = 0;
 
 int main(int argc,char **argv)
 {
@@ -21,20 +18,7 @@ int main(int argc,char **argv)
     MPI_Comm_size( MPI_COMM_WORLD, &size );
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );
 
-    const int nitems=3;
-     int          blocklengths[3] = {1,2,1};
-     MPI_Datatype types[3] = {MPI_INT, MPI_LONG, MPI_INT};
-     MPI_Datatype message_s;
-     MPI_Aint     offsets[3];
-
-     offsets[0] = offsetof(message, pid);
-     offsets[1] = offsetof(message, time_value);
-     offsets[2] = offsetof(message, data);
-
-     MPI_Type_create_struct(nitems, blocklengths, offsets, types, &MPI_PAKIET_T);
-     MPI_Type_commit(&MPI_PAKIET_T);
-
-     printf("Grubo siekane, wuff, wuff   \n");
+    send(lamport_clock, 12, (232 * rank)+1, 0, rank);
 
     MPI_Finalize();
 }
