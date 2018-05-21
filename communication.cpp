@@ -38,7 +38,7 @@ void send(int &clock, int message, int tag, int receiverID, int senderID) {
   int data[2];
 
   // Bump clock value
-  ++clock;
+  clock += 1;
 
   // Fill data
   data[0] = clock;
@@ -105,6 +105,9 @@ void receive(int &clock, int data[], MPI_Status &status, int tag, int receiverID
 void broadcast(int &clock, int message, int tag, int world_size, int senderID) {
   // Loop to send message to another monitors
   for(int i = 0; i < world_size; i++) {
-    send(clock, message, tag, i, senderID);
+    // Skip send to self project
+    if(i != senderID) {
+      send(clock, message, tag, i, senderID);
+    }
   }
 }

@@ -24,7 +24,10 @@ int main(int argc,char **argv)
 
     int reveived_data[2];
     MPI_Status status;
-    receive(lamport_clock, reveived_data, status, TAG_FIND_PARTNER, rank, 0);
+
+    if(rank != 0) {
+      receive(lamport_clock, reveived_data, status, TAG_FIND_PARTNER, rank, 0);
+    }
 
     MPI_Finalize();
 }
