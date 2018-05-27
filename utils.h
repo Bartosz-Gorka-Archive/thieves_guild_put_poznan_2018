@@ -35,7 +35,13 @@ struct Request {
   }
 
   bool operator < (const Request& str) const {
-    return time < str.time;
+    if (time < str.time) {
+      return true;
+    } else if (time == str.time && pid < str.pid) {
+      return true;
+    }
+
+    return false;
   }
 };
 
