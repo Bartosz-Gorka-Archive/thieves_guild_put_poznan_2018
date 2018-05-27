@@ -29,11 +29,20 @@ struct Request {
    */
   int pid;
 
+  /*
+   * Request structu constructor
+   * @param t - Time
+   * @param p - PID
+   */
   Request(int t, int p) {
     time = t;
     pid = p;
   }
 
+  /*
+   * Override operator <
+   * @param str - Request structure to compare
+   */
   bool operator < (const Request& str) const {
     if (time < str.time) {
       return true;
