@@ -51,27 +51,32 @@ int main(int argc,char **argv) {
   if (!set_parameters(argc, argv)) {
     puts("[ERROR] You should start with NAME P D parameters (P and D greater than zero)");
   } else {
+    // Parameters setup with success
     puts("[INFO] Parameters setup correct");
-  }
 
-  int size,rank;
-  MPI_Init(&argc, &argv);
-  // MPI_Comm_size( MPI_COMM_WORLD, &size );
-  // MPI_Comm_rank( MPI_COMM_WORLD, &rank );
-  //
-  // std::vector<Request> vec;
-  // vec.push_back(Request(3, 4));
-  // vec.push_back(Request(3, 3));
-  // vec.push_back(Request(3, 5));
-  // vec.push_back(Request(1, 6));
-  //
-  // for(int i = 0; i < vec.size(); ++i)
-  //   printf("%d =>  [%d] [%d]\n", i, vec[i].time, vec[i].pid);
-  //
-  // sort_requests(vec);
-  //
-  // for(int i = 0; i < vec.size(); ++i)
-  //   printf("%d =>  [%d] [%d]\n", i, vec[i].time, vec[i].pid);
+    int size,rank;
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size( MPI_COMM_WORLD, &size );
+    MPI_Comm_rank( MPI_COMM_WORLD, &rank );
+
+    std::vector<Request> vec;
+    vec.push_back(Request(3, 4));
+    vec.push_back(Request(3, 3));
+    vec.push_back(Request(3, 5));
+    vec.push_back(Request(1, 6));
+
+    puts("Original vector");
+    for(int i = 0; i < vec.size(); ++i)
+      printf("%d =>  [%d] [%d]\n", i, vec[i].time, vec[i].pid);
+
+    sort_requests(vec);
+
+    puts("After sort vector");
+    for(int i = 0; i < vec.size(); ++i)
+      printf("%d =>  [%d] [%d]\n", i, vec[i].time, vec[i].pid);
+
+    MPI_Finalize();
+  }
 
   // if(rank == 0) {
   //   broadcast(lamport_clock, 12, TAG_FIND_PARTNER, size, 0);
@@ -83,6 +88,4 @@ int main(int argc,char **argv) {
   // if(rank != 0) {
   //   receive(lamport_clock, reveived_data, status, TAG_FIND_PARTNER, rank, 0);
   // }
-
-  MPI_Finalize();
 }
