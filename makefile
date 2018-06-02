@@ -5,7 +5,7 @@ OUTPUT_FILE := thieves_guild
 all: clean $(OUTPUT_FILE)
 
 $(OUTPUT_FILE): $(SOURCES) $(HEADERS)
-	mpic++ -Wall -o $(OUTPUT_FILE) $(SOURCES)
+	mpic++ -Wall -pthread -o $(OUTPUT_FILE) $(SOURCES)
 
 clean:
 	$(RM) $(OUTPUT_FILE)
