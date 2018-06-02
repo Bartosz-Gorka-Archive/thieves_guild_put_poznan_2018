@@ -49,7 +49,7 @@ void send(int &clock, int message, int tag, int receiverID, int senderID) {
 
   // When enabled debug mode - show extra details
   if (debug_mode) {
-    printf("[TIMER: %05d][PID: %02d][TAG: %03d] Send '%d' to process %d.\n",
+    printf("[%05d][%02d][TAG: %03d] Send '%d' to process %d.\n",
            data[0], senderID, tag, data[1], receiverID);
   }
 
@@ -86,7 +86,7 @@ void receive(int &clock, int data[], MPI_Status &status, int tag, int receiverID
 
   // When enabled debug mode - show extra details
   if (debug_mode) {
-    printf("[TIMER: %05d][PID: %02d][TAG: %03d] Receive '%d' from process %d.\n",
+    printf("[%05d][%02d][TAG: %03d] Receive '%d' from process %d.\n",
            clock, receiverID, status.MPI_TAG, data[1], status.MPI_SOURCE);
   }
 
