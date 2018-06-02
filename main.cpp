@@ -1,18 +1,40 @@
+/*
+ * Thieves' Guild project
+ *  Poznań, May - Juny 2018
+ *
+ * main.cpp
+ *  Most important file - main functions inside Thieves' Guild project
+ *
+ * Authors:
+ *  Jarosław Skrzypczak index. 127265 (@jarkendar)
+ *  Bartosz Górka index. 127228 (@bartoszgorka)
+ */
+
+// System library
 #include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <vector>
 
+// Own library
 #include "tags.h"
 #include "utils.h"
 #include "communication.h"
 
-// TODO docs
+/*
+ * Clock mutex to ensure correct modifications
+ */
 pthread_mutex_t clock_mutex = PTHREAD_MUTEX_INITIALIZER;
+/*
+ * If set `true` - show extra details inside program.
+ * On production env should be set to `false`.
+ */
 bool debug_mode = true;
+/*
+ * Clock - default, start value = 0.
+ */
 int lamport_clock = 0;
-
 /*
  * P - Office capacity
  */
@@ -21,10 +43,13 @@ int P = 0;
  * D - Number of houses to be robbed
  */
 int D = 0;
-
-// Global variables to MPI Init
-// TODO docs
+/*
+ * Current process rank (process ID).
+ */
 int rank;
+/*
+ * Total process' number.
+ */
 int size;
 
 /*
@@ -49,7 +74,12 @@ bool set_parameters(int argc, char *argv[]) {
   return false;
 }
 
-// TODO description
+/*
+ * Enable threads inside project, check MPI_THREAD_MULTIPLE status.
+ * When not supported - exit program.
+ * @param int *argc - Reference to number of parameters
+ * @param char **argv - Reference to parameters
+ */
 void enable_thread(int *argc, char ***argv) {
   // Check support
   int status = 0;
