@@ -8,6 +8,7 @@
 #include "utils.h"
 #include "communication.h"
 
+// TODO docs
 pthread_mutex_t clock_mutex = PTHREAD_MUTEX_INITIALIZER;
 bool debug_mode = true;
 int lamport_clock = 0;
@@ -20,6 +21,11 @@ int P = 0;
  * D - Number of houses to be robbed
  */
 int D = 0;
+
+// Global variables to MPI Init
+// TODO docs
+int rank;
+int size;
 
 /*
  * Set parameters inside project
@@ -43,6 +49,48 @@ bool set_parameters(int argc, char *argv[]) {
   return false;
 }
 
+// TODO description
+void enable_thread(int *argc, char ***argv) {
+  // Check support
+  int status = 0;
+  MPI_Init_thread(argc, argv, MPI_THREAD_MULTIPLE, &status);
+
+  // Debug mode? - Show current MPI support level
+  if (debug_mode) {
+    switch (status) {
+      case MPI_THREAD_SINGLE:
+        printf("[INFO] Thread level supported: MPI_THREAD_SINGLE\n");
+        break;
+      case MPI_THREAD_FUNNELED:
+        printf("[INFO] Thread level supported: MPI_THREAD_FUNNELED\n");
+        break;
+      case MPI_THREAD_SERIALIZED:
+        printf("[INFO] Thread level supported: MPI_THREAD_SERIALIZED\n");
+        break;
+      case MPI_THREAD_MULTIPLE:
+        printf("[INFO] Thread level supported: MPI_THREAD_MULTIPLE\n");
+        break;
+      default:
+        printf("[INFO] Thread level supported: UNRECOGNIZED\n");
+        exit(EXIT_FAILURE);
+    }
+  }
+
+  // When thread not supported - exit
+  if (status != MPI_THREAD_MULTIPLE) {
+    fprintf(stderr, "[ERROR] There is not enough support for threads - I'm leaving!\n");
+    MPI_Finalize();
+    exit(EXIT_FAILURE);
+  }
+}
+
+// TODO function
+void *receive_loop(void *thread) {
+    while(1) {
+      // TODO Receive
+    }
+}
+
 int main(int argc,char **argv) {
   // stdout - disable bufforing
   setbuf(stdout, NULL);
@@ -52,28 +100,73 @@ int main(int argc,char **argv) {
     puts("[ERROR] You should start with NAME P D parameters (P and D greater than zero)");
   } else {
     // Parameters setup with success
-    puts("[INFO] Parameters setup correct");
+    printf("[INFO] Parameters setup correct\n");
 
-    int size,rank;
-    MPI_Init(&argc, &argv);
-    MPI_Comm_size( MPI_COMM_WORLD, &size );
-    MPI_Comm_rank( MPI_COMM_WORLD, &rank );
+    // Check MPI threads
+    enable_thread(&argc, &argv);
 
-    std::vector<Request> vec;
-    vec.push_back(Request(3, 4));
-    vec.push_back(Request(3, 3));
-    vec.push_back(Request(3, 5));
-    vec.push_back(Request(1, 6));
+    // Create new thread - run for receive messages in loop (as monitor)
+    pthread_t monitor_thread;
+    pthread_create(&monitor_thread, NULL, receive_loop, 0);
 
-    puts("Original vector");
-    for(int i = 0; i < vec.size(); ++i)
-      printf("%d =>  [%d] [%d]\n", i, vec[i].time, vec[i].pid);
+    // Get process ID and total process number
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    sort_requests(vec);
+    // Random seed depends on process rank
+    srand(rank);
 
-    puts("After sort vector");
-    for(int i = 0; i < vec.size(); ++i)
-      printf("%d =>  [%d] [%d]\n", i, vec[i].time, vec[i].pid);
+    // Barier to start calculations
+    printf("[INFO] PROCESS %d READY\n", rank);
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    // std::vector<Request> vec;
+    // vec.push_back(Request(3, 4));
+    // vec.push_back(Request(3, 3));
+    // vec.push_back(Request(3, 5));
+    // vec.push_back(Request(1, 6));
+    //
+    // puts("Original vector");
+    // for(int i = 0; i < vec.size(); ++i)
+    //   printf("%d =>  [%d] [%d]\n", i, vec[i].time, vec[i].pid);
+    //
+    // sort_requests(vec);
+    //
+    // puts("After sort vector");
+    // for(int i = 0; i < vec.size(); ++i)
+    //   printf("%d =>  [%d] [%d]\n", i, vec[i].time, vec[i].pid);
+    bool has_partner = false;
+    if (rank == 0) {
+      // Request friend
+      bool decisions[size];
+      for (int i = 0; i < size; i++) {
+        decisions[i] = false;
+      }
+      decisions[rank] = true;
+
+      broadcast(lamport_clock, 11, TAG_FIND_PARTNER, size, rank);
+
+      int reveived_data[2];
+      MPI_Status status;
+
+      for (int i = 1; i < size; i++) {
+        receive(lamport_clock, reveived_data, status, 12, rank, MPI_ANY_SOURCE);
+        // printf("%d %d\n", status.MPI_SOURCE, reveived_data[0]);
+        if (reveived_data[1] == 1) {
+          decisions[status.MPI_SOURCE] = true;
+        }
+      }
+
+      for (int i = 0; i < size; i++) {
+        printf("%d %d\n", i, decisions[i]);
+      }
+    } else {
+      // receive
+      int reveived_data[2];
+      MPI_Status status;
+      receive(lamport_clock, reveived_data, status, TAG_FIND_PARTNER, rank, 0);
+      send(lamport_clock, rank % 2, 12, 0, rank);
+    }
 
     MPI_Finalize();
   }
