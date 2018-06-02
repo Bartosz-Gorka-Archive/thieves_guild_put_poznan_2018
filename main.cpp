@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <vector>
+#include <unistd.h>
 
 // Own library
 #include "tags.h"
@@ -51,6 +52,15 @@ int rank;
  * Total process' number.
  */
 int size;
+
+bool run_program = true;
+bool has_partner = false;
+int partnerID = 0;
+std::vector<Request> partner_queue;
+pthread_mutex_t partner_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+int received_friendship_response = 0;
+pthread_mutex_t received_friendship_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*
  * Set parameters inside project
@@ -114,11 +124,82 @@ void enable_thread(int *argc, char ***argv) {
   }
 }
 
+void increment_received_friendship_response() {
+  pthread_mutex_lock(&received_friendship_mutex);
+  received_friendship_response++;
+  pthread_mutex_unlock(&received_friendship_mutex);
+}
+
+void add_friendship_response(int timer_value, int senderID) {
+  pthread_mutex_lock(&partner_mutex);
+  Request request = Request(timer_value, senderID);
+  partner_queue.push_back(request);
+  pthread_mutex_unlock(&partner_mutex);
+}
+
+void remove_from_friendship_queue(int senderID) {
+  pthread_mutex_lock(&partner_mutex);
+  for (size_t i = 0; i < partner_queue.size(); i++) {
+    if (partner_queue[i].pid == senderID) {
+      partner_queue.erase(partner_queue.begin() + i);
+      break;
+    }
+  }
+  pthread_mutex_unlock(&partner_mutex);
+}
+
 // TODO function
 void *receive_loop(void *thread) {
-    while(1) {
-      // TODO Receive
+  while(run_program) {
+    MPI_Status status;
+    int data[2];
+    receive(lamport_clock, data, status, MPI_ANY_TAG, rank, MPI_ANY_SOURCE);
+
+    switch (status.MPI_TAG) {
+      case TAG_FIND_PARTNER:
+        // Check partner status
+        pthread_mutex_lock(&partner_mutex);
+        if (has_partner) {
+          pthread_mutex_unlock(&partner_mutex);
+          send(lamport_clock, partnerID, TAG_ALREADY_PAIRED, status.MPI_SOURCE, rank);
+        } else {
+          pthread_mutex_unlock(&partner_mutex);
+          send(lamport_clock, rank, TAG_ACCEPT_PARTNER, status.MPI_SOURCE, rank);
+        }
+
+        // End case TAG_FIND_PARTNER
+        break;
+
+      case TAG_ALREADY_PAIRED:
+        // Add +1 to received response about friendship
+        increment_received_friendship_response();
+
+        // End case TAG_ALREADY_PAIRED
+        break;
+
+      case TAG_ACCEPT_PARTNER:
+        // Add +1 to received response about friendship
+        increment_received_friendship_response();
+        add_friendship_response(data[0], status.MPI_SOURCE);
+
+        // End case TAG_ACCEPT_PARTNER
+        break;
+
+      case TAG_SELECTED_PARTNER:
+        // Delete sender and his partner from queue
+        remove_from_friendship_queue(data[1]);
+        remove_from_friendship_queue(status.MPI_SOURCE);
+
+        // End case TAG_SELECTED_PARTNER
+        break;
+
+      default:
+        printf("[%d][%d][ERROR] Invalid tag '%d' from process %d.\n", lamport_clock, rank, status.MPI_TAG, status.MPI_SOURCE);
+        exit(1);
     }
+  }
+
+  return 0;
 }
 
 int main(int argc,char **argv) {
@@ -150,65 +231,35 @@ int main(int argc,char **argv) {
     printf("[INFO] PROCESS %d READY\n", rank);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    // std::vector<Request> vec;
-    // vec.push_back(Request(3, 4));
-    // vec.push_back(Request(3, 3));
-    // vec.push_back(Request(3, 5));
-    // vec.push_back(Request(1, 6));
-    //
-    // puts("Original vector");
-    // for(int i = 0; i < vec.size(); ++i)
-    //   printf("%d =>  [%d] [%d]\n", i, vec[i].time, vec[i].pid);
-    //
-    // sort_requests(vec);
-    //
-    // puts("After sort vector");
-    // for(int i = 0; i < vec.size(); ++i)
-    //   printf("%d =>  [%d] [%d]\n", i, vec[i].time, vec[i].pid);
-    bool has_partner = false;
+    // 1. Find partner
     if (rank == 0) {
-      // Request friend
-      bool decisions[size];
-      for (int i = 0; i < size; i++) {
-        decisions[i] = false;
-      }
-      decisions[rank] = true;
+      broadcast(lamport_clock, rank, TAG_FIND_PARTNER, size, rank);
+      add_friendship_response(lamport_clock, rank);
 
-      broadcast(lamport_clock, 11, TAG_FIND_PARTNER, size, rank);
-
-      int reveived_data[2];
-      MPI_Status status;
-
-      for (int i = 1; i < size; i++) {
-        receive(lamport_clock, reveived_data, status, 12, rank, MPI_ANY_SOURCE);
-        // printf("%d %d\n", status.MPI_SOURCE, reveived_data[0]);
-        if (reveived_data[1] == 1) {
-          decisions[status.MPI_SOURCE] = true;
-        }
+      sleep(3);
+      sort_requests(partner_queue);
+      for (int i = 0; i < partner_queue.size(); i++) {
+        printf("%d %d\n", partner_queue[i].time, partner_queue[i].pid);
       }
 
-      for (int i = 0; i < size; i++) {
-        printf("%d %d\n", i, decisions[i]);
+      send(lamport_clock, 1, TAG_SELECTED_PARTNER, 0, 0);
+      sleep(3);
+      sort_requests(partner_queue);
+      for (int i = 0; i < partner_queue.size(); i++) {
+        printf("%d %d\n", partner_queue[i].time, partner_queue[i].pid);
       }
-    } else {
-      // receive
-      int reveived_data[2];
-      MPI_Status status;
-      receive(lamport_clock, reveived_data, status, TAG_FIND_PARTNER, rank, 0);
-      send(lamport_clock, rank % 2, 12, 0, rank);
     }
 
-    MPI_Finalize();
-  }
+    // Set end calculations
+    run_program = false;
 
-  // if(rank == 0) {
-  //   broadcast(lamport_clock, 12, TAG_FIND_PARTNER, size, 0);
-  // }
-  //
-  // int reveived_data[2];
-  // MPI_Status status;
-  //
-  // if(rank != 0) {
-  //   receive(lamport_clock, reveived_data, status, TAG_FIND_PARTNER, rank, 0);
-  // }
+    // Sleep to ensure all threads refresh local reference to `run_program` variable
+    sleep(10);
+
+    // Finalize MPI
+    MPI_Finalize();
+
+    // End without errors
+    return 0;
+  }
 }

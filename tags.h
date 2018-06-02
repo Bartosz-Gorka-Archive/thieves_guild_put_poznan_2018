@@ -1,6 +1,6 @@
 /*
  * Thieves' Guild project
- *  Poznań, May 2018
+ *  Poznań, May - Juny 2018
  *
  * tags.h
  *  MPI Tags header file, all tags prepared in single file to enable easier
@@ -22,12 +22,19 @@
 /*
  * Tag - already in pair
  */
-#define TAG_ALREADY_PAIRED 120
+#define TAG_ALREADY_PAIRED 111
 #endif
 
 #ifndef TAG_ACCEPT_PARTNER
 /*
  * Tag - acceptance of the proposal
  */
-#define TAG_ACCEPT_PARTNER 130
+#define TAG_ACCEPT_PARTNER 112
+#endif
+
+#ifndef TAG_SELECTED_PARTNER
+/*
+ * Tag - selected partner
+ */
+#define TAG_SELECTED_PARTNER 113
 #endif
