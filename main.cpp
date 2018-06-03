@@ -168,15 +168,20 @@ void want_partner() {
   while(received_friendship_response < total_process) {
     usleep(1000);
   }
-  printf("[%05d][%02d] Received all messages\n", lamport_clock, myPID);
+
+  if (debug_mode) {
+    printf("[%05d][%02d] Received all messages\n", lamport_clock, myPID);
+  }
+
   // You received all confirmations but total process number is odd - ignore you (bye!)
   while(partnerID == -1) {
-    // usleep(1000);
-    sleep(2);
-    printf("%d - %d\n", myPID, partnerID);
+    usleep(1000);
   }
-  // Selected partner - go to robbery
-  printf("[%05d][%02d] I have partner! Selected process %02d\n", lamport_clock, myPID, partnerID);
+
+  if (debug_mode) {
+    // Selected partner - go to robbery
+    printf("[%05d][%02d] I have partner! Selected process %02d\n", lamport_clock, myPID, partnerID);
+  }
 }
 
 /*
@@ -231,7 +236,9 @@ void *receive_loop(void *thread) {
           if (positions[0] > positions[1]) {
             send(lamport_clock, -1, -1, TAG_ACCEPT_PARTNER, status.MPI_SOURCE, myPID);
           } else {
-            printf("[%05d][%02d] Ignore TAG_FIND_PARTNER from %d (positions %d and %d)\n", lamport_clock, myPID, status.MPI_SOURCE, positions[0], positions[1]);
+            if (debug_mode) {
+              printf("[%05d][%02d] Ignore TAG_FIND_PARTNER from %d (positions %d and %d)\n", lamport_clock, myPID, status.MPI_SOURCE, positions[0], positions[1]);
+            }
           }
 
         // End case TAG_FIND_PARTNER
@@ -243,7 +250,10 @@ void *receive_loop(void *thread) {
         received_friendship_response++;
 
         if (received_friendship_response == total_process) {
-          printf("[%05d][%02d] Last friend response\n", lamport_clock, myPID);
+          if (debug_mode) {
+            printf("[%05d][%02d] Last friend response\n", lamport_clock, myPID);
+          }
+
           // Check list size
           pthread_mutex_lock(&partner_mutex);
           // If more process - select second and set as partner
@@ -265,8 +275,6 @@ void *receive_loop(void *thread) {
         remove_from_friendship_queue(status.MPI_SOURCE);
         received_friendship_response++;
 
-        printf("%d %d %d\n", lamport_clock, myPID, received_friendship_response);
-
         // I was selected by first process
         if (data[2] == myPID) {
           // Remove my request
@@ -276,7 +284,10 @@ void *receive_loop(void *thread) {
           // Broadcast my release
           broadcast(lamport_clock, myPID, myPID, TAG_SELECTED_PARTNER, total_process, myPID);
         } else if (received_friendship_response == total_process) {
-          printf("[%05d][%02d] Last friend response\n", lamport_clock, myPID);
+          if (debug_mode) {
+            printf("[%05d][%02d] Last friend response\n", lamport_clock, myPID);
+          }
+
           // Check list size
           pthread_mutex_lock(&partner_mutex);
           // If more process - select second and set as partner
@@ -313,7 +324,9 @@ int main(int argc,char **argv) {
     puts("[ERROR] You should start with NAME P D parameters (P and D greater than zero)");
   } else {
     // Parameters setup with success
-    printf("[INFO] Parameters setup correct\n");
+    if (debug_mode) {
+      printf("[INFO] Parameters setup correct\n");
+    }
 
     // Check MPI threads
     enable_thread(&argc, &argv);
@@ -330,18 +343,13 @@ int main(int argc,char **argv) {
     srand(myPID);
 
     // Barier to start calculations
-    printf("[%05d][%02d][INFO] PROCESS %d READY\n", lamport_clock, myPID, myPID);
+    if (debug_mode) {
+      printf("[%05d][%02d][INFO] PROCESS %d READY\n", lamport_clock, myPID, myPID);
+    }
     MPI_Barrier(MPI_COMM_WORLD);
 
     // 1. Find partner
-    // if(myPID == 0)
-      want_partner();
-
-    // Wait until set partner
-    // while(!has_partner) {
-      // printf("[%05d][%02d] Still no partner - loop\n", lamport_clock, myPID);
-      // usleep(1000);
-    // }
+    want_partner();
 
     // Has partner - can find house to robbery
     // TODO implementation
@@ -350,7 +358,9 @@ int main(int argc,char **argv) {
     run_program = false;
 
     // Sleep to ensure all threads refresh local reference to `run_program` variable
-    printf("[%05d][%02d][INFO] Sleep 10 seconds to enable correct finish program\n", lamport_clock, myPID);
+    if (debug_mode) {
+      printf("[%05d][%02d][INFO] Sleep 10 seconds to enable correct finish program\n", lamport_clock, myPID);
+    }
     sleep(10);
 
     // Finalize MPI
