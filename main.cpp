@@ -55,6 +55,8 @@ int received_friendship_response = 1;
 int partnerID = -1;
 // Start time - clock value in access to partner critical section
 int start_find_partner_time = INT_MAX;
+// Selected house ID
+int houseID = -1;
 
 /*
  * Debug function to show currect state of friend queue
@@ -295,7 +297,12 @@ void want_house() {
 }
 
 void robbery() {
-  // TODO
+  // Show message
+  printf("[%05d][%02d] With %02d visit house %d\n", lamport_clock, myPID, partnerID, houseID);
+  // Sleep random time
+  int sleep_time = (rand() % 4) + 1;
+  printf("[%05d][%02d] Sleep %d\n", lamport_clock, myPID, sleep_time);
+  sleep(sleep_time);
 }
 
 int main(int argc,char **argv) {
