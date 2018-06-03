@@ -162,7 +162,14 @@ void want_partner() {
   while(received_friendship_response + 1 < total_process) {
     usleep(1000);
   }
-  printf("%d GO\n", myPID);
+  printf("[%05d][%02d] I'm the first! GO GO GO!!!\n", lamport_clock, myPID);
+}
+
+void insert_request(int time, int pid) {
+  pthread_mutex_lock(&partner_mutex);
+  partner_queue.push_back(Request(time, pid));
+  sort_requests(partner_queue);
+  pthread_mutex_unlock(&partner_mutex);
 }
 
 /*
@@ -182,17 +189,13 @@ void *receive_loop(void *thread) {
     switch (status.MPI_TAG) {
       case TAG_FIND_PARTNER:
           puts("TAG_FIND_PARTNER");
-          pthread_mutex_lock(&partner_mutex);
-          partner_queue.push_back(Request(data[2], status.MPI_SOURCE));
-          sort_requests(partner_queue);
-          pthread_mutex_unlock(&partner_mutex);
-
+          insert_request(data[2], status.MPI_SOURCE);
           check_both_positions(positions, partner_mutex, partner_queue, myPID, status.MPI_SOURCE);
 
           if (positions[0] > positions[1]) {
             send(lamport_clock, -1, -1, TAG_ACCEPT_PARTNER, status.MPI_SOURCE, myPID);
           } else {
-            printf("[%d][%d] -- %d %d \n", lamport_clock, myPID, positions[0], positions[1]);
+            printf("[%05d][%02d] Ignore TAG_FIND_PARTNER from %d (positions %d and %d)\n", lamport_clock, myPID, status.MPI_SOURCE, positions[0], positions[1]);
           }
 
         // End case TAG_FIND_PARTNER
