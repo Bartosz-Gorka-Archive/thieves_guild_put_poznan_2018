@@ -24,23 +24,41 @@
 #include "utils.h"
 #include "communication.h"
 
+// Debug mode - if set `true` - show all logs.
+// On `false` show only most important logs
 bool debug_mode = false;
+// My clock value
 int lamport_clock = 0;
+// Number of houses
 int D = 0;
+// My process ID - assigned by MPI
 int myPID;
+// Total process inside world - assigned by MPI
 int total_process;
+// Important parameter to enable correct finish threads - without extra variable can raise errors
 bool run_program = true;
 
+// Vector with requests - requests to access to find partner critical section
 std::vector<Request> partner_queue;
 
+// Mutex - clock
 pthread_mutex_t clock_mutex = PTHREAD_MUTEX_INITIALIZER;
+// Mutex - partner queue
 pthread_mutex_t partner_mutex = PTHREAD_MUTEX_INITIALIZER;
+// Mutex - partner response number (for secure update variable because is it possible to send multi messages)
 pthread_mutex_t partner_response_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+// Number of received ACK to friend find critical section
+// Default 1 - your own ACK ;)
 int received_friendship_response = 1;
+// Partner ID, default -1 to correct check this inside functions
 int partnerID = -1;
+// Start time - clock value in access to partner critical section
 int start_find_partner_time = INT_MAX;
 
+/*
+ * Debug function to show currect state of friend queue
+ */
 void show_friend_queue() {
   pthread_mutex_lock(&partner_mutex);
   for (size_t i = 0; i < partner_queue.size(); i++) {
@@ -187,7 +205,7 @@ void want_partner() {
     }
 
     sleep(1);
-    printf("\tNo partner for %d\n", myPID);
+    // printf("\tNo partner for %d\n", myPID);
   }
 
   // Selected partner - go to robbery
@@ -222,7 +240,9 @@ void *receive_loop(void *thread) {
     // Check status and do code
     switch (status.MPI_TAG) {
       case TAG_FIND_PARTNER: {
+        // Append request with orignal time to queue
         insert_partner_request(data[2], status.MPI_SOURCE);
+        // Send response - note sender about receive message
         send(lamport_clock, start_find_partner_time, start_find_partner_time, TAG_RESPONSE_PARTNER, status.MPI_SOURCE, myPID);
 
         // End case TAG_FIND_PARTNER
@@ -230,6 +250,7 @@ void *receive_loop(void *thread) {
       }
 
       case TAG_RESPONSE_PARTNER: {
+        // Increment received response counter - for security with mutex
         pthread_mutex_lock(&partner_response_mutex);
         received_friendship_response++;
         pthread_mutex_unlock(&partner_response_mutex);
@@ -241,12 +262,16 @@ void *receive_loop(void *thread) {
       case TAG_SELECTED_PARTNER: {
         // I was chosen!
         if (data[1] == myPID) {
+          // My partner - sender
           partnerID = status.MPI_SOURCE;
 
+          // Remove his request and my request from queue
           remove_from_friendship_queue(myPID);
           remove_from_friendship_queue(status.MPI_SOURCE);
+          // Broadcast to all process - exit from section
           broadcast(lamport_clock, myPID, myPID, TAG_SELECTED_PARTNER, total_process, myPID);
         } else {
+          // Just remove sender's request from queue
           remove_from_friendship_queue(status.MPI_SOURCE);
         }
 
@@ -255,6 +280,7 @@ void *receive_loop(void *thread) {
       }
 
       default: {
+        // Default - raise error because received not supported TAG inside message
         printf("[%05d][%02d][ERROR] Invalid tag '%d' from process %d.\n", lamport_clock, myPID, status.MPI_TAG, status.MPI_SOURCE);
         exit(1);
       }
