@@ -18,13 +18,6 @@
 #define TAG_FIND_PARTNER 110
 #endif
 
-#ifndef TAG_ALREADY_PAIRED
-/*
- * Tag - already in pair
- */
-#define TAG_ALREADY_PAIRED 111
-#endif
-
 #ifndef TAG_ACCEPT_PARTNER
 /*
  * Tag - acceptance of the proposal
