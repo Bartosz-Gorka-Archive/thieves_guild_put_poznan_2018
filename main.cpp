@@ -30,7 +30,7 @@ pthread_mutex_t clock_mutex = PTHREAD_MUTEX_INITIALIZER;
  * If set `true` - show extra details inside program.
  * On production env should be set to `false`.
  */
-bool debug_mode = true;
+bool debug_mode = false;
 // Clock - default, start value = 0.
 int lamport_clock = 0;
 // P - Office capacity
@@ -175,13 +175,15 @@ void want_partner() {
 
   // You received all confirmations but total process number is odd - ignore you (bye!)
   while(partnerID == -1) {
-    usleep(1000);
+    // usleep(1000);
+    sleep(1);
+    printf("\tStill %d\n", myPID);
   }
 
-  if (debug_mode) {
+  // if (debug_mode) {
     // Selected partner - go to robbery
     printf("[%05d][%02d] I have partner! Selected process %02d\n", lamport_clock, myPID, partnerID);
-  }
+  // }
 }
 
 /*
@@ -248,22 +250,27 @@ void *receive_loop(void *thread) {
       case TAG_ACCEPT_PARTNER: {
         // Mark response as received
         received_friendship_response++;
+        // if (debug_mode) {
+          printf("[%05d][%02d] AP - Received %d / %d\n", lamport_clock, myPID, received_friendship_response, total_process);
+        // }
 
         if (received_friendship_response == total_process) {
           if (debug_mode) {
             printf("[%05d][%02d] Last friend response\n", lamport_clock, myPID);
           }
 
+          // Remove me from list
+          remove_from_friendship_queue(myPID);
+
           // Check list size
           pthread_mutex_lock(&partner_mutex);
           // If more process - select second and set as partner
-          if (partner_queue.size() > 1) {
-            partnerID = partner_queue[1].pid;
+          if (partner_queue.size() >= 1) {
+            partnerID = partner_queue[0].pid;
           }
           pthread_mutex_unlock(&partner_mutex);
 
-          // Remove my from queue and send broadcast message
-          remove_from_friendship_queue(myPID);
+          // Send broadcast message
           broadcast(lamport_clock, partnerID, partnerID, TAG_SELECTED_PARTNER, total_process, myPID);
         }
 
@@ -274,30 +281,29 @@ void *receive_loop(void *thread) {
       case TAG_SELECTED_PARTNER: {
         remove_from_friendship_queue(status.MPI_SOURCE);
         received_friendship_response++;
+        // if (debug_mode) {
+          printf("[%05d][%02d] SP - Received %d / %d\n", lamport_clock, myPID, received_friendship_response, total_process);
+        // }
 
-        // I was selected by first process
-        if (data[2] == myPID) {
-          // Remove my request
+        if (received_friendship_response == total_process) {
+          // Remove me from list
           remove_from_friendship_queue(myPID);
-          // Set partner ID as event source
-          partnerID = status.MPI_SOURCE;
-          // Broadcast my release
-          broadcast(lamport_clock, myPID, myPID, TAG_SELECTED_PARTNER, total_process, myPID);
-        } else if (received_friendship_response == total_process) {
-          if (debug_mode) {
-            printf("[%05d][%02d] Last friend response\n", lamport_clock, myPID);
-          }
 
-          // Check list size
-          pthread_mutex_lock(&partner_mutex);
-          // If more process - select second and set as partner
-          if (partner_queue.size() > 1) {
-            partnerID = partner_queue[1].pid;
-          }
-          pthread_mutex_unlock(&partner_mutex);
-          // Set flag to send release message
+          // Someone take my process to robbery
+          if (data[2] == myPID) {
+            pthread_mutex_lock(&partner_mutex);
+            partnerID = status.MPI_SOURCE;
+            pthread_mutex_unlock(&partner_mutex);
+          } else {
+            // I must choose someone
 
-          remove_from_friendship_queue(myPID);
+            pthread_mutex_lock(&partner_mutex);
+            if (partner_queue.size() >= 1) {
+              partnerID = partner_queue[0].pid;
+            }
+            pthread_mutex_unlock(&partner_mutex);
+          }
+          // Send broadcast message
           broadcast(lamport_clock, partnerID, partnerID, TAG_SELECTED_PARTNER, total_process, myPID);
         }
 
