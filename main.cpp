@@ -24,35 +24,30 @@
 #include "utils.h"
 #include "communication.h"
 
-// Clock mutex to ensure correct modifications
-pthread_mutex_t clock_mutex = PTHREAD_MUTEX_INITIALIZER;
-/*
- * If set `true` - show extra details inside program.
- * On production env should be set to `false`.
- */
 bool debug_mode = false;
-// Clock - default, start value = 0.
 int lamport_clock = 0;
-// P - Office capacity
-int P = 0;
-// D - Number of houses to be robbed
 int D = 0;
-// Current process myPID (process ID).
 int myPID;
-// Total process' number.
 int total_process;
-// Run program - flag to enable correct program flow
 bool run_program = true;
-// Has partner to robbery - default false (changed in program running)
-bool has_partner = false;
-// Vector with Requests to find partner
+
 std::vector<Request> partner_queue;
-// Mutex to ensure correct update partner ID / has_partner variable or partner list
+
+pthread_mutex_t clock_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t partner_mutex = PTHREAD_MUTEX_INITIALIZER;
-// Received partnership responses
-int received_friendship_response = 1; // One from myself
-// Partner ID
+pthread_mutex_t partner_response_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+int received_friendship_response = 1;
 int partnerID = -1;
+int start_find_partner_time = INT_MAX;
+
+void show_friend_queue() {
+  pthread_mutex_lock(&partner_mutex);
+  for (size_t i = 0; i < partner_queue.size(); i++) {
+    printf("\t [%d] %lu => %d\n", myPID, i+1, partner_queue[i].pid);
+  }
+  pthread_mutex_unlock(&partner_mutex);
+}
 
 /*
  * Set parameters inside project
@@ -61,13 +56,12 @@ int partnerID = -1;
  * @return boolean - status, true when set done success, false if found errors with parameters
  */
 bool set_parameters(int argc, char *argv[]) {
-  // Required NAME P D ...
-  if (argc >= 3) {
-    P = atoi(argv[1]);
-    D = atoi(argv[2]);
+  // Required NAME D ...
+  if (argc >= 2) {
+    D = atoi(argv[1]);
 
-    // Validate possitive values inside variables
-    if (D > 0 && P > 0) {
+    // Validate possitive value inside variable
+    if (D > 0) {
       return true;
     }
   }
@@ -123,7 +117,7 @@ void enable_thread(int *argc, char ***argv) {
  * @param int pid - Process ID (to check)
  * @return int position - Process position (default 2 to block access to critical section)
  */
-int check_single_position(pthread_mutex_t &mutex, std::vector<Request> &list, int pid) {
+int check_position(pthread_mutex_t &mutex, std::vector<Request> &list, int pid) {
   int position = INT_MAX;
   pthread_mutex_lock(&mutex);
   for (size_t i = 0; i < partner_queue.size(); i++) {
@@ -134,69 +128,6 @@ int check_single_position(pthread_mutex_t &mutex, std::vector<Request> &list, in
   }
   pthread_mutex_unlock(&mutex);
   return position;
-}
-
-void check_both_positions(int positions[], pthread_mutex_t &mutex, std::vector<Request> &list, int PID, int secondPID) {
-  positions[0] = INT_MAX;
-  positions[1] = INT_MAX;
-
-  pthread_mutex_lock(&mutex);
-  for (size_t i = 0; i < partner_queue.size(); i++) {
-    if (partner_queue[i].pid == PID) {
-      positions[0] = i;
-    }
-    if (partner_queue[i].pid == secondPID) {
-      positions[1] = i;
-    }
-  }
-  pthread_mutex_unlock(&mutex);
-}
-
-/*
- * Want partner to robbery.
- */
-void want_partner() {
-  Request temp = Request(lamport_clock, myPID);
-  // Lock, append request, sort, unlock
-  pthread_mutex_lock(&partner_mutex);
-  partner_queue.push_back(temp);
-  sort_requests(partner_queue);
-  pthread_mutex_unlock(&partner_mutex);
-  // Broadcast find partner request
-  broadcast(lamport_clock, temp.time, temp.time, TAG_FIND_PARTNER, total_process, myPID);
-  // Wait until receive all confirmations
-  while(received_friendship_response < total_process) {
-    usleep(1000);
-  }
-
-  if (debug_mode) {
-    printf("[%05d][%02d] Received all messages\n", lamport_clock, myPID);
-  }
-
-  // You received all confirmations but total process number is odd - ignore you (bye!)
-  while(partnerID == -1) {
-    // usleep(1000);
-    sleep(1);
-    printf("\tStill %d\n", myPID);
-  }
-
-  // if (debug_mode) {
-    // Selected partner - go to robbery
-    printf("[%05d][%02d] I have partner! Selected process %02d\n", lamport_clock, myPID, partnerID);
-  // }
-}
-
-/*
- * Insert new request to partner vector.
- * For reduce security issues - also sort requests list
- * @param int time - Time
- * @param int pid - Process ID
- */
-void insert_partner_request(int time, int pid) {
-  pthread_mutex_lock(&partner_mutex);
-  partner_queue.push_back(Request(time, pid));
-  sort_requests(partner_queue);
-  pthread_mutex_unlock(&partner_mutex);
 }
 
 /*
@@ -217,6 +148,66 @@ void remove_from_friendship_queue(int senderID) {
 }
 
 /*
+ * Want partner to robbery.
+ */
+void want_partner() {
+  Request temp = Request(lamport_clock, myPID);
+  // Lock, append request, sort, unlock
+  pthread_mutex_lock(&partner_mutex);
+  partner_queue.push_back(temp);
+  start_find_partner_time = temp.time;
+  pthread_mutex_unlock(&partner_mutex);
+  // Broadcast find partner request
+  broadcast(lamport_clock, temp.time, temp.time, TAG_FIND_PARTNER, total_process, myPID);
+  // Wait until receive all confirmations
+  while(received_friendship_response < total_process) {
+    usleep(1000);
+  }
+
+  printf("[%05d][%02d] Received all messages\n", lamport_clock, myPID);
+
+  // Sort requests
+  sort_requests(partner_queue);
+
+  // You received all confirmations but total process number is odd - ignore you (bye!)
+  while(partnerID == -1) {
+    // usleep(1000);
+    if (check_position(partner_mutex, partner_queue, myPID) == 0) {
+      pthread_mutex_lock(&partner_mutex);
+      // On list my process and someone else
+      if (partner_queue.size() >= 1) {
+        partnerID = partner_queue[1].pid;
+        pthread_mutex_unlock(&partner_mutex);
+
+        remove_from_friendship_queue(myPID);
+        broadcast(lamport_clock, partnerID, partnerID, TAG_SELECTED_PARTNER, total_process, myPID);
+      } else {
+        pthread_mutex_unlock(&partner_mutex);
+      }
+    }
+
+    sleep(1);
+    printf("\tNo partner for %d\n", myPID);
+  }
+
+  // Selected partner - go to robbery
+  printf("[%05d][%02d] I have partner! Selected process %02d\n", lamport_clock, myPID, partnerID);
+}
+
+/*
+ * Insert new request to partner vector.
+ * For reduce security issues - also sort requests list
+ * @param int time - Time
+ * @param int pid - Process ID
+ */
+void insert_partner_request(int time, int pid) {
+  pthread_mutex_lock(&partner_mutex);
+  partner_queue.push_back(Request(time, pid));
+  sort_requests(partner_queue);
+  pthread_mutex_unlock(&partner_mutex);
+}
+
+/*
  * Function to MPI thread - create monitor process to receive messages in loop and update process state.
  */
 void *receive_loop(void *thread) {
@@ -225,86 +216,38 @@ void *receive_loop(void *thread) {
     // Status & data to receive function
     MPI_Status status;
     int data[3];
-    int positions[2];
     // Receive message
     receive(lamport_clock, data, status, MPI_ANY_TAG, myPID, MPI_ANY_SOURCE);
 
     // Check status and do code
     switch (status.MPI_TAG) {
       case TAG_FIND_PARTNER: {
-          insert_partner_request(data[2], status.MPI_SOURCE);
-          check_both_positions(positions, partner_mutex, partner_queue, myPID, status.MPI_SOURCE);
-
-          if (positions[0] > positions[1]) {
-            send(lamport_clock, -1, -1, TAG_ACCEPT_PARTNER, status.MPI_SOURCE, myPID);
-          } else {
-            if (debug_mode) {
-              printf("[%05d][%02d] Ignore TAG_FIND_PARTNER from %d (positions %d and %d)\n", lamport_clock, myPID, status.MPI_SOURCE, positions[0], positions[1]);
-            }
-          }
+        insert_partner_request(data[2], status.MPI_SOURCE);
+        send(lamport_clock, start_find_partner_time, start_find_partner_time, TAG_RESPONSE_PARTNER, status.MPI_SOURCE, myPID);
 
         // End case TAG_FIND_PARTNER
         break;
       }
 
-      case TAG_ACCEPT_PARTNER: {
-        // Mark response as received
+      case TAG_RESPONSE_PARTNER: {
+        pthread_mutex_lock(&partner_response_mutex);
         received_friendship_response++;
-        // if (debug_mode) {
-          printf("[%05d][%02d] AP - Received %d / %d\n", lamport_clock, myPID, received_friendship_response, total_process);
-        // }
+        pthread_mutex_unlock(&partner_response_mutex);
 
-        if (received_friendship_response == total_process) {
-          if (debug_mode) {
-            printf("[%05d][%02d] Last friend response\n", lamport_clock, myPID);
-          }
-
-          // Remove me from list
-          remove_from_friendship_queue(myPID);
-
-          // Check list size
-          pthread_mutex_lock(&partner_mutex);
-          // If more process - select second and set as partner
-          if (partner_queue.size() >= 1) {
-            partnerID = partner_queue[0].pid;
-          }
-          pthread_mutex_unlock(&partner_mutex);
-
-          // Send broadcast message
-          broadcast(lamport_clock, partnerID, partnerID, TAG_SELECTED_PARTNER, total_process, myPID);
-        }
-
-        // End case TAG_ACCEPT_PARTNER
+        // End case TAG_RESPONSE_PARTNER
         break;
       }
 
       case TAG_SELECTED_PARTNER: {
-        remove_from_friendship_queue(status.MPI_SOURCE);
-        received_friendship_response++;
-        // if (debug_mode) {
-          printf("[%05d][%02d] SP - Received %d / %d\n", lamport_clock, myPID, received_friendship_response, total_process);
-        // }
+        // I was chosen!
+        if (data[1] == myPID) {
+          partnerID = status.MPI_SOURCE;
 
-        if (received_friendship_response == total_process) {
-          // Remove me from list
           remove_from_friendship_queue(myPID);
-
-          // Someone take my process to robbery
-          if (data[2] == myPID) {
-            pthread_mutex_lock(&partner_mutex);
-            partnerID = status.MPI_SOURCE;
-            pthread_mutex_unlock(&partner_mutex);
-          } else {
-            // I must choose someone
-
-            pthread_mutex_lock(&partner_mutex);
-            if (partner_queue.size() >= 1) {
-              partnerID = partner_queue[0].pid;
-            }
-            pthread_mutex_unlock(&partner_mutex);
-          }
-          // Send broadcast message
-          broadcast(lamport_clock, partnerID, partnerID, TAG_SELECTED_PARTNER, total_process, myPID);
+          remove_from_friendship_queue(status.MPI_SOURCE);
+          broadcast(lamport_clock, myPID, myPID, TAG_SELECTED_PARTNER, total_process, myPID);
+        } else {
+          remove_from_friendship_queue(status.MPI_SOURCE);
         }
 
         // End case TAG_SELECTED_PARTNER
@@ -321,13 +264,21 @@ void *receive_loop(void *thread) {
   return 0;
 }
 
+void want_house() {
+  // TODO
+}
+
+void robbery() {
+  // TODO
+}
+
 int main(int argc,char **argv) {
   // stdout - disable bufforing
   setbuf(stdout, NULL);
 
   // Set program parameters
   if (!set_parameters(argc, argv)) {
-    puts("[ERROR] You should start with NAME P D parameters (P and D greater than zero)");
+    puts("[ERROR] You should start with NAME D parameters (D greater than zero)");
   } else {
     // Parameters setup with success
     if (debug_mode) {
@@ -354,11 +305,17 @@ int main(int argc,char **argv) {
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    // 1. Find partner
-    want_partner();
+    // while(1) {
+      // init_variables();
+      // 1. Find partner
+      want_partner();
 
-    // Has partner - can find house to robbery
-    // TODO implementation
+      // 2. Find house to robbery
+      want_house();
+
+      // 3. Robbery
+      robbery();
+    // }
 
     // Set end calculations
     run_program = false;

@@ -12,22 +12,13 @@
  */
 
 #ifndef TAG_FIND_PARTNER
-/*
- * Tag - start find partner process
- */
 #define TAG_FIND_PARTNER 110
 #endif
 
-#ifndef TAG_ACCEPT_PARTNER
-/*
- * Tag - acceptance of the proposal
- */
-#define TAG_ACCEPT_PARTNER 112
+#ifndef TAG_RESPONSE_PARTNER
+#define TAG_RESPONSE_PARTNER 120
 #endif
 
 #ifndef TAG_SELECTED_PARTNER
-/*
- * Tag - selected partner
- */
-#define TAG_SELECTED_PARTNER 113
+#define TAG_SELECTED_PARTNER 130
 #endif
