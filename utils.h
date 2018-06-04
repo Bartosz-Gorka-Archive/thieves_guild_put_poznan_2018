@@ -61,4 +61,10 @@ struct Request {
  */
 void sort_requests(std::vector<Request> &list);
 
+/*
+ * Sort list of int.
+ * @param std::vector &list
+ */
+void sort_list(std::vector<int> &list);
+
 #endif

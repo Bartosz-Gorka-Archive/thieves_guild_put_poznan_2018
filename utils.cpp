@@ -21,3 +21,11 @@
 void sort_requests(std::vector<Request> &list) {
   std::sort(list.begin(), list.end());
 }
+
+/*
+ * Sort list of int.
+ * @param std::vector &list
+ */
+void sort_list(std::vector<int> &list) {
+  std::sort(list.begin(), list.end());
+}
