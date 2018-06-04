@@ -713,6 +713,7 @@ void fill_papers() {
   // If master - send release from saloon critical section
   if (master) {
     remove_from_saloon_queue(myPID);
+    printf("[%05d][%02d] Exit from saloon\n", lamport_clock, myPID);
     broadcast(lamport_clock, iteration, partnerID, TAG_RELEASE_SALOON, total_process, myPID);
   }
 }
