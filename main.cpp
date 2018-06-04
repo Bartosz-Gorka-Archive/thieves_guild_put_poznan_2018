@@ -567,6 +567,15 @@ void want_house() {
           }
           houseID = i;
           notSelected = false;
+
+          pthread_mutex_lock(&houses_to_return_mutex);
+          for (int k = 0; k < D; k++) {
+            if(i != k && !checkAlreadyHasHouse(k)) {
+              broadcast(lamport_clock, k, k, TAG_HOUSE_EXIT, total_process, myPID);
+            }
+          }
+          pthread_mutex_unlock(&houses_to_return_mutex);
+
           send(lamport_clock, houseID, houseID, TAG_SELECT_HOUSE, partnerID, myPID);
           break;
         }
