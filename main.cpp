@@ -26,7 +26,7 @@
 
 // Debug mode - if set `true` - show all logs.
 // On `false` show only most important logs
-bool debug_mode = false;
+bool debug_mode = true;
 // My clock value
 int lamport_clock = 0;
 // Number of houses
@@ -40,6 +40,8 @@ bool run_program = true;
 
 // Vector with requests - requests to access to find partner critical section
 std::vector<Request> partner_queue;
+// Array with lists of requests to all houses
+std::vector<Request> *houses_vec;
 
 // Mutex - clock
 pthread_mutex_t clock_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -47,6 +49,10 @@ pthread_mutex_t clock_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t partner_mutex = PTHREAD_MUTEX_INITIALIZER;
 // Mutex - partner response number (for secure update variable because is it possible to send multi messages)
 pthread_mutex_t partner_response_mutex = PTHREAD_MUTEX_INITIALIZER;
+// Mutex arrays for houses
+std::vector<pthread_mutex_t> houses_mutex;
+// Single mutex for access to table
+pthread_mutex_t houses_array_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Number of received ACK to friend find critical section
 // Default 1 - your own ACK ;)
@@ -55,8 +61,12 @@ int received_friendship_response = 1;
 int partnerID = -1;
 // Start time - clock value in access to partner critical section
 int start_find_partner_time = INT_MAX;
+// Start time - clock value in access to houses critical section
+int start_find_house_time = INT_MAX;
 // Selected house ID
 int houseID = -1;
+// Array with responses (counters) about houses
+int *houses_responses_array;
 
 /*
  * Debug function to show currect state of friend queue
@@ -140,8 +150,8 @@ void enable_thread(int *argc, char ***argv) {
 int check_position(pthread_mutex_t &mutex, std::vector<Request> &list, int pid) {
   int position = INT_MAX;
   pthread_mutex_lock(&mutex);
-  for (size_t i = 0; i < partner_queue.size(); i++) {
-    if (partner_queue[i].pid == pid) {
+  for (size_t i = 0; i < list.size(); i++) {
+    if (list[i].pid == pid) {
       position = i;
       break;
     }
@@ -187,7 +197,9 @@ void want_partner() {
   printf("[%05d][%02d] Received all messages\n", lamport_clock, myPID);
 
   // Sort requests
+  pthread_mutex_lock(&partner_mutex);
   sort_requests(partner_queue);
+  pthread_mutex_unlock(&partner_mutex);
 
   // You received all confirmations but total process number is odd - ignore you (bye!)
   while(partnerID == -1) {
@@ -225,6 +237,66 @@ void insert_partner_request(int time, int pid) {
   partner_queue.push_back(Request(time, pid));
   sort_requests(partner_queue);
   pthread_mutex_unlock(&partner_mutex);
+}
+
+/*
+ * Insert new request to house vector.
+ * This is bulk action - insert to all lists
+ * For reduce security issues - also sort requests list
+ * @param int time - Time
+ * @param int pid - Process ID
+ */
+void insert_bulk_house_request(int time, int pid) {
+  for (size_t i = 0; i < D; i++) {
+    pthread_mutex_lock(&houses_mutex[i]);
+    houses_vec[i].push_back(Request(time, pid));
+    sort_requests(houses_vec[i]);
+    pthread_mutex_unlock(&houses_mutex[i]);
+  }
+}
+
+/*
+ * Debug function to show current status of all houses queues
+ */
+void show_house_queues() {
+  for (size_t i = 0; i < D; i++) {
+    pthread_mutex_lock(&houses_mutex[i]);
+    for (size_t k = 0; k < houses_vec[i].size(); k++) {
+      printf("\t [%d] List %lu | %lu => %d\n", myPID, i, k+1, houses_vec[i][k].pid);
+    }
+    pthread_mutex_unlock(&houses_mutex[i]);
+  }
+}
+
+/*
+ * Security (with lock & unclock mutex) update houses_responses_array.
+ */
+void increment_houses_counter() {
+  pthread_mutex_lock(&houses_array_mutex);
+  for (size_t i = 0; i < D; i++) {
+    houses_responses_array[i] += 1;
+  }
+  pthread_mutex_unlock(&houses_array_mutex);
+}
+
+/*
+ * Remove requests from all queues with skip only selected ID
+ * @param int selectedHouseID - House ID
+ * @param int senderID - Sender process ID
+ */
+void remove_from_houses_queues(int selectedHouseID, int senderID) {
+  for (size_t i = 0; i < D; i++) {
+    if (i != selectedHouseID) {
+      pthread_mutex_lock(&houses_mutex[i]);
+      for (size_t j = 0; j < houses_vec[i].size(); j++) {
+        if (houses_vec[i][j].pid == senderID) {
+          houses_vec[i].erase(houses_vec[i].begin() + j);
+          break;
+        }
+      }
+      pthread_mutex_unlock(&houses_mutex[i]);
+    }
+  }
 }
 
 /*
@@ -281,6 +353,35 @@ void *receive_loop(void *thread) {
         break;
       }
 
+      case TAG_HOUSE_REQUEST: {
+        // Append request with orignal time to queue
+        insert_bulk_house_request(data[2], status.MPI_SOURCE);
+        // Send response - note sender about receive message
+        send(lamport_clock, start_find_house_time, start_find_house_time, TAG_RESPONSE_HOUSE, status.MPI_SOURCE, myPID);
+
+        // End case TAG_HOUSE_REQUEST
+        break;
+      }
+
+      case TAG_RESPONSE_HOUSE: {
+        increment_houses_counter();
+        // End case TAG_RESPONSE_HOUSE
+        break;
+      }
+
+      case TAG_SELECT_HOUSE: {
+        // Message from my partner (master) - save details about selected house
+        if (status.MPI_SOURCE == partnerID) {
+          houseID = data[1];
+        }
+
+        // Remove all request with houseID != selected inside data[1]
+        remove_from_houses_queues(data[1], status.MPI_SOURCE);
+
+        // End case TAG_SELECT_HOUSE
+        break;
+      }
+
       default: {
         // Default - raise error because received not supported TAG inside message
         printf("[%05d][%02d][ERROR] Invalid tag '%d' from process %d.\n", lamport_clock, myPID, status.MPI_TAG, status.MPI_SOURCE);
@@ -292,8 +393,79 @@ void *receive_loop(void *thread) {
   return 0;
 }
 
+/*
+ * Want access to house
+ */
 void want_house() {
-  // TODO
+  // Lower PID can access to critical sections
+  if (myPID < partnerID) {
+    Request temp = Request(lamport_clock, myPID);
+    // Lock, append request, sort, unlock
+    for (size_t i = 0; i < D; i++) {
+      pthread_mutex_lock(&houses_mutex[i]);
+      houses_vec[i].push_back(temp);
+      start_find_house_time = temp.time;
+      sort_requests(houses_vec[i]);
+      pthread_mutex_unlock(&houses_mutex[i]);
+    }
+    // Broadcast find available house
+    broadcast(lamport_clock, temp.time, temp.time, TAG_HOUSE_REQUEST, total_process, myPID);
+    // Wait until receive all confirmations
+    bool wait = true;
+    do {
+      usleep(1000);
+      pthread_mutex_lock(&houses_array_mutex);
+      for (size_t i = 0; i < D; i++) {
+        if(houses_responses_array[i] == total_process) {
+          wait = false;
+          break;
+        }
+      }
+      pthread_mutex_unlock(&houses_array_mutex);
+    } while(wait);
+
+    printf("[%05d][%02d] Received all messages in one of house queue\n", lamport_clock, myPID);
+
+    // For security also again sort vectors
+    for (size_t i = 0; i < D; i++) {
+      pthread_mutex_lock(&houses_mutex[i]);
+      sort_requests(houses_vec[i]);
+      pthread_mutex_unlock(&houses_mutex[i]);
+    }
+
+    // Check can select one house
+    bool notSelected = true;
+    do {
+      pthread_mutex_lock(&houses_array_mutex);
+      for (size_t i = 0; i < D; i++) {
+        if(houses_responses_array[i] == total_process && check_position(houses_mutex[i], houses_vec[i], myPID) == 0) {
+          printf("[%05d][%02d] Can full access to %d house\n", lamport_clock, myPID, i);
+          houseID = i;
+          notSelected = false;
+          remove_from_houses_queues(i, myPID);
+          broadcast(lamport_clock, houseID, i, TAG_SELECT_HOUSE, total_process, myPID);
+          break;
+        }
+      }
+      pthread_mutex_unlock(&houses_array_mutex);
+
+      if(notSelected) {
+        sleep(1);
+        printf("\tMaster %02d can't access house\n", myPID);
+      }
+    } while(houseID == -1);
+
+    // Selected house to robbery
+    printf("[%05d][%02d] I have house! Selected to robbery %02d\n", lamport_clock, myPID, houseID);
+  } else {
+    printf("[%05d][%02d] Skip requests, %02d should try to access\n", lamport_clock, myPID, partnerID);
+
+    // Wait until master send message about house
+    while(houseID == -1) {
+      sleep(1);
+      printf("\tSlave %02d sleep - wait house assign\n", myPID);
+    }
+  }
 }
 
 void robbery() {
@@ -303,6 +475,10 @@ void robbery() {
   int sleep_time = (rand() % 4) + 1;
   printf("[%05d][%02d] Sleep %d\n", lamport_clock, myPID, sleep_time);
   sleep(sleep_time);
+}
+
+void release_resources() {
+  // TODO
 }
 
 int main(int argc,char **argv) {
@@ -332,6 +508,15 @@ int main(int argc,char **argv) {
     // Random seed depends on process myPID
     srand(myPID);
 
+    // Initialize variables
+    houses_responses_array = new int[D];
+    houses_vec = new std::vector<Request>[D];
+    for (int i = 0; i < D; i++) {
+      houses_responses_array[i] = 1;
+      pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+      houses_mutex.push_back(mutex);
+    }
+
     // Barier to start calculations
     if (debug_mode) {
       printf("[%05d][%02d][INFO] PROCESS %d READY\n", lamport_clock, myPID, myPID);
@@ -339,7 +524,6 @@ int main(int argc,char **argv) {
     MPI_Barrier(MPI_COMM_WORLD);
 
     // while(1) {
-      // init_variables();
       // 1. Find partner
       want_partner();
 
@@ -348,6 +532,9 @@ int main(int argc,char **argv) {
 
       // 3. Robbery
       robbery();
+
+      // 4. Release all resource
+      release_resources();
     // }
 
     // Set end calculations

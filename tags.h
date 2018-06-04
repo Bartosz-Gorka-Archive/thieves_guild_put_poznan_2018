@@ -31,3 +31,24 @@
  */
 #define TAG_SELECTED_PARTNER 130
 #endif
+
+#ifndef TAG_HOUSE_REQUEST
+/*
+ * TAG for houses request (bulk)
+ */
+#define TAG_HOUSE_REQUEST 200
+#endif
+
+#ifndef TAG_RESPONSE_HOUSE
+/*
+ * TAG for send response about houses request
+ */
+#define TAG_RESPONSE_HOUSE 210
+#endif
+
+#ifndef TAG_SELECT_HOUSE
+/*
+ * TAG for receive details about selected house by external process
+ */
+#define TAG_SELECT_HOUSE 220
+#endif
