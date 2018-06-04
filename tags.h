@@ -59,3 +59,24 @@
  */
 #define TAG_HOUSE_EXIT 250
 #endif
+
+#ifndef TAG_ENTER_SALOON
+/*
+ * TAG for notify all process about enter to saloon's critical section
+ */
+#define TAG_ENTER_SALOON 300
+#endif
+
+#ifndef TAG_CONFIRM_SALOON
+/*
+ * TAG for confirm sender TAG_ENTER_SALOON
+ */
+#define TAG_CONFIRM_SALOON 310
+#endif
+
+#ifndef TAG_RELEASE_SALOON
+/*
+ * TAG for notify process about exit from saloon's critical section
+ */
+#define TAG_RELEASE_SALOON 320
+#endif

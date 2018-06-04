@@ -208,7 +208,6 @@ void want_partner() {
 
   // You received all confirmations but total process number is odd - ignore you (bye!)
   while(partnerID == -1) {
-    // usleep(1000);
     if (check_position(partner_mutex, partner_queue, myPID) == 1) {
       pthread_mutex_lock(&partner_mutex);
       // On list my process and someone else
@@ -226,7 +225,6 @@ void want_partner() {
     }
 
     sleep(1);
-    // printf("\tNo partner for %d\n", myPID);
   }
 
   // Selected partner - go to robbery
@@ -488,7 +486,7 @@ void want_house() {
 
       if(notSelected) {
         sleep(1);
-        printf("\tMaster %02d can't access house\n", myPID);
+        printf("[%05d][%02d] Master can't access house\n", lamport_clock, myPID);
       }
     } while(houseID == -1);
 
@@ -500,7 +498,7 @@ void want_house() {
     // Wait until master send message about house
     while(houseID == -1) {
       sleep(1);
-      printf("\tSlave %02d sleep - wait house assign\n", myPID);
+      printf("[%05d][%02d] Slave sleep - wait house assign\n", lamport_clock, myPID);
     }
   }
 }
@@ -527,12 +525,12 @@ void release_resources() {
     int lastHouseID = houseID;
     houseID = -1;
     broadcast(lamport_clock, lastHouseID, lastHouseID, TAG_HOUSE_EXIT, total_process, myPID);
-    printf("\t[%05d][%02d] Release %02d house\n", lamport_clock, myPID, lastHouseID);
+    printf("[%05d][%02d] Release %02d house\n", lamport_clock, myPID, lastHouseID);
   } else {
     // We wait until master send release house
     while(houseID != -1) {
       sleep(1);
-      printf("\t[%02d] Wait until Master %02d send me goodbye\n", myPID, partnerID);
+      printf("[%05d][%02d] Wait until Master %02d send me goodbye\n", lamport_clock, myPID, partnerID);
     }
   }
 }
@@ -555,6 +553,14 @@ void init_variables() {
 
   // Release house
   houseID = -1;
+}
+
+void want_saloon() {
+  // TODO
+}
+
+void fill_papers() {
+  // TODO
 }
 
 /*
@@ -607,7 +613,7 @@ int main(int argc, char **argv) {
 
     while(1) {
       iteration++;
-      printf("[%05d][%02d] -- CODE RUN -- %d --\n", lamport_clock, myPID, iteration);
+      printf("[%05d][%02d] -- CODE RUN -- ITERATION %02d --\n", lamport_clock, myPID, iteration);
 
       // 1. Init variables
       init_variables();
@@ -618,10 +624,16 @@ int main(int argc, char **argv) {
       // 3. Find house to robbery
       want_house();
 
-      // 4. Robbery
+      // 4. Try access to saloon
+      want_saloon();
+
+      // 5. Fill papers and release saloon
+      fill_papers();
+
+      // 6. Robbery
       robbery();
 
-      // 5. Release all resource
+      // 7. Release all resource
       release_resources();
     }
 
@@ -629,10 +641,7 @@ int main(int argc, char **argv) {
     run_program = false;
 
     // Sleep to ensure all threads refresh local reference to `run_program` variable
-    //if (debug_mode) {
-      //printf("[%05d][%02d][INFO] Sleep 10 seconds to enable correct finish program\n", lamport_clock, myPID);
-    //}
-    sleep(100);
+    sleep(10);
 
     // Finalize MPI
     MPI_Finalize();
