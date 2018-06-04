@@ -46,6 +46,8 @@ bool is_in_saloon = false;
 std::vector<Request> partner_queue;
 // Vector with requests to access saloon's critical section
 std::vector<Request> saloon_queue;
+// List of houseIDs to return
+std::vector<int> houses_to_return_list;
 // Array with lists of requests to all houses
 std::vector<Request> *houses_vec;
 
@@ -61,6 +63,8 @@ std::vector<pthread_mutex_t> houses_mutex;
 pthread_mutex_t houses_array_mutex = PTHREAD_MUTEX_INITIALIZER;
 // Saloon mutex
 pthread_mutex_t saloon_mutex = PTHREAD_MUTEX_INITIALIZER;
+// Houses to return mutex
+pthread_mutex_t houses_to_return_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Number of received ACK to friend find critical section
 // Default 1 - your own ACK ;)
@@ -281,18 +285,16 @@ void insert_saloon_request(int time, int pid) {
 
 /*
  * Insert new request to house vector.
- * This is bulk action - insert to all lists
  * For reduce security issues - also sort requests list
+ * @param int ID - selected House
  * @param int time - Time
  * @param int pid - Process ID
  */
-void insert_bulk_house_request(int time, int pid) {
-  for (int i = 0; i < D; i++) {
-    pthread_mutex_lock(&houses_mutex[i]);
-    houses_vec[i].push_back(Request(time, pid));
-    sort_requests(houses_vec[i]);
-    pthread_mutex_unlock(&houses_mutex[i]);
-  }
+void insert_house_request(int ID, int time, int pid) {
+  pthread_mutex_lock(&houses_mutex[ID]);
+  houses_vec[ID].push_back(Request(time, pid));
+  sort_requests(houses_vec[ID]);
+  pthread_mutex_unlock(&houses_mutex[ID]);
 }
 
 /*
@@ -310,33 +312,12 @@ void show_house_queues() {
 
 /*
  * Security (with lock & unclock mutex) update houses_responses_array.
+ * @param int ID - selected House ID
  */
-void increment_houses_counter() {
+void increment_houses_counter(int ID) {
   pthread_mutex_lock(&houses_array_mutex);
-  for (int i = 0; i < D; i++) {
-    houses_responses_array[i] += 1;
-  }
+  houses_responses_array[ID] += 1;
   pthread_mutex_unlock(&houses_array_mutex);
-}
-
-/*
- * Remove requests from all queues with skip only selected ID
- * @param int selectedHouseID - House ID
- * @param int senderID - Sender process ID
- */
-void remove_from_houses_queues(int selectedHouseID, int senderID) {
-  for (int i = 0; i < D; i++) {
-    if (i != selectedHouseID) {
-      pthread_mutex_lock(&houses_mutex[i]);
-      for (size_t j = 0; j < houses_vec[i].size(); j++) {
-        if (houses_vec[i][j].pid == senderID) {
-          houses_vec[i].erase(houses_vec[i].begin() + j);
-          break;
-        }
-      }
-      pthread_mutex_unlock(&houses_mutex[i]);
-    }
-  }
 }
 
 /*
@@ -353,6 +334,26 @@ void remove_from_single_house_queues(int selectedHouseID, int senderID) {
     }
   }
   pthread_mutex_unlock(&houses_mutex[selectedHouseID]);
+}
+
+void *release_assigned_houses(void *thread) {
+  // Run in loop until `run_program` set as true
+  while(run_program) {
+    int sleep_time = (rand() % 100000) + 30000;
+
+    pthread_mutex_lock(&houses_to_return_mutex);
+    if (!houses_to_return_list.empty()) {
+      int selectedID = houses_to_return_list[0];
+      printf("[%05d][%02d] Release house %02d\n", lamport_clock, myPID, selectedID);
+      remove_from_single_house_queues(selectedID, myPID);
+      houses_to_return_list.erase(houses_to_return_list.begin());
+      broadcast(lamport_clock, selectedID, selectedID, TAG_HOUSE_EXIT, total_process, myPID);
+    }
+    pthread_mutex_unlock(&houses_to_return_mutex);
+
+    usleep(sleep_time);
+  }
+  return 0;
 }
 
 /*
@@ -410,18 +411,25 @@ void *receive_loop(void *thread) {
         break;
       }
 
+      case TAG_FINISH_PARTNERSHIP: {
+        houseID = -1;
+
+        // End case TAG_FINISH_PARTNERSHIP
+        break;
+      }
+
       case TAG_HOUSE_REQUEST: {
         // Append request with orignal time to queue
-        insert_bulk_house_request(data[2], status.MPI_SOURCE);
+        insert_house_request(data[1], data[2], status.MPI_SOURCE);
         // Send response - note sender about receive message
-        send(lamport_clock, myPID, myPID, TAG_RESPONSE_HOUSE, status.MPI_SOURCE, myPID);
+        send(lamport_clock, data[1], data[1], TAG_RESPONSE_HOUSE, status.MPI_SOURCE, myPID);
 
         // End case TAG_HOUSE_REQUEST
         break;
       }
 
       case TAG_RESPONSE_HOUSE: {
-        increment_houses_counter();
+        increment_houses_counter(data[1]);
         // End case TAG_RESPONSE_HOUSE
         break;
       }
@@ -432,19 +440,11 @@ void *receive_loop(void *thread) {
           houseID = data[1];
         }
 
-        // Remove all request with houseID != selected inside data[1]
-        remove_from_houses_queues(data[1], status.MPI_SOURCE);
-
         // End case TAG_SELECT_HOUSE
         break;
       }
 
       case TAG_HOUSE_EXIT: {
-        // Message from my partner (master) - release house
-        if (status.MPI_SOURCE == partnerID) {
-          houseID = -1;
-        }
-
         // Remove request
         remove_from_single_house_queues(data[1], status.MPI_SOURCE);
 
@@ -500,23 +500,38 @@ void *receive_loop(void *thread) {
   return 0;
 }
 
+bool checkAlreadyHasHouse(int ID) {
+  for (size_t i = 0; i < houses_to_return_list.size(); i++) {
+    if (houses_to_return_list[i] == ID) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /*
  * Want access to house
  */
 void want_house() {
   // Master can access to critical sections
   if (master) {
-    Request temp = Request(lamport_clock, myPID);
-    // Lock, append request, sort, unlock
+    pthread_mutex_lock(&houses_to_return_mutex);
     for (int i = 0; i < D; i++) {
-      pthread_mutex_lock(&houses_mutex[i]);
-      houses_vec[i].push_back(temp);
-      sort_requests(houses_vec[i]);
-      pthread_mutex_unlock(&houses_mutex[i]);
+      if(!checkAlreadyHasHouse(i)) {
+        Request temp = Request(lamport_clock, myPID);
+        // Lock, append request, sort, unlock
+        pthread_mutex_lock(&houses_mutex[i]);
+        houses_vec[i].push_back(temp);
+        sort_requests(houses_vec[i]);
+        pthread_mutex_unlock(&houses_mutex[i]);
+
+        // Broadcast find available house
+        broadcast(lamport_clock, i, temp.time, TAG_HOUSE_REQUEST, total_process, myPID);
+      }
     }
-    // Broadcast find available house
-    broadcast(lamport_clock, temp.time, temp.time, TAG_HOUSE_REQUEST, total_process, myPID);
-    // Wait until receive all confirmations
+    pthread_mutex_unlock(&houses_to_return_mutex);
+
+    // Wait until receive all confirmations in minimum one critical section
     bool wait = true;
     do {
       usleep(1000);
@@ -552,8 +567,7 @@ void want_house() {
           }
           houseID = i;
           notSelected = false;
-          remove_from_houses_queues(i, myPID);
-          broadcast(lamport_clock, houseID, i, TAG_SELECT_HOUSE, total_process, myPID);
+          send(lamport_clock, houseID, houseID, TAG_SELECT_HOUSE, partnerID, myPID);
           break;
         }
       }
@@ -586,7 +600,7 @@ void robbery() {
   printf("[%05d][%02d] With %02d visit house %d\n", lamport_clock, myPID, partnerID, houseID);
   // Sleep random time
   int sleep_time = (rand() % 4) + 1;
-  printf("[%05d][%02d] Sleep %d\n", lamport_clock, myPID, sleep_time);
+  printf("[%05d][%02d] -- ROBBERY -- [%02d seconds]\n", lamport_clock, myPID, sleep_time);
   sleep(sleep_time);
 }
 
@@ -597,10 +611,18 @@ void release_resources() {
   // Master can access to critical sections
   if (master) {
     // We must send to slave message and exit critical section for houseID
-    int lastHouseID = houseID;
-    houseID = -1;
-    broadcast(lamport_clock, lastHouseID, lastHouseID, TAG_HOUSE_EXIT, total_process, myPID);
-    printf("[%05d][%02d] Release %02d house\n", lamport_clock, myPID, lastHouseID);
+    send(lamport_clock, houseID, partnerID, TAG_FINISH_PARTNERSHIP, partnerID, myPID);
+
+    // Set house as required to return
+    pthread_mutex_lock(&houses_to_return_mutex);
+    houses_to_return_list.push_back(houseID);
+
+    pthread_mutex_lock(&houses_array_mutex);
+    houses_responses_array[houseID] = 1;
+    pthread_mutex_unlock(&houses_array_mutex);
+
+    pthread_mutex_unlock(&houses_to_return_mutex);
+    printf("[%05d][%02d] Exit from partnership with %02d\n", lamport_clock, myPID, partnerID);
   } else {
     // We wait until master send release house
     while(houseID != -1) {
@@ -619,14 +641,7 @@ void init_variables() {
   partnerID = -1;
   pthread_mutex_unlock(&partner_mutex);
 
-  // ACK in house queues
-  pthread_mutex_lock(&houses_array_mutex);
-  for (int i = 0; i < D; i++) {
-    houses_responses_array[i] = 1;
-  }
-  pthread_mutex_unlock(&houses_array_mutex);
-
-  // Release house
+  // Release current house
   houseID = -1;
 }
 
@@ -690,7 +705,7 @@ void want_saloon() {
  * After sleep random time, master send release message in broadcast.
  */
 void fill_papers() {
-  int sleep_time = (rand() % 10) + 2;
+  int sleep_time = (rand() % 5) + 2;
   printf("[%05d][%02d] Fill papers [%02d seconds]\n", lamport_clock, myPID, sleep_time);
   sleep(sleep_time);
   printf("[%05d][%02d] Papers ready\n", lamport_clock, myPID);
@@ -725,8 +740,10 @@ int main(int argc, char **argv) {
     enable_thread(&argc, &argv);
 
     // Create new thread - run for receive messages in loop (as monitor)
-    pthread_t monitor_thread;
-    pthread_create(&monitor_thread, NULL, receive_loop, 0);
+    pthread_t monitor_thread_receiver;
+    pthread_create(&monitor_thread_receiver, NULL, receive_loop, 0);
+    pthread_t monitor_thread_sender;
+    pthread_create(&monitor_thread_sender, NULL, release_assigned_houses, 0);
 
     // Get process ID and total process number
     MPI_Comm_rank(MPI_COMM_WORLD, &myPID);

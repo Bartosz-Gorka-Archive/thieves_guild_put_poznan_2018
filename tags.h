@@ -32,6 +32,13 @@
 #define TAG_SELECTED_PARTNER 130
 #endif
 
+#ifndef TAG_FINISH_PARTNERSHIP
+/*
+ * TAG for note partner about exit from partnership
+ */
+#define TAG_FINISH_PARTNERSHIP 150
+#endif
+
 #ifndef TAG_HOUSE_REQUEST
 /*
  * TAG for houses request (bulk)
