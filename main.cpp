@@ -31,6 +31,8 @@ bool debug_mode = false;
 int lamport_clock = 0;
 // Number of houses
 int D = 0;
+// Maximum process inside saloon
+int P = 0;
 // My process ID - assigned by MPI
 int myPID;
 // Total process inside world - assigned by MPI
@@ -91,11 +93,12 @@ void show_friend_queue() {
  */
 bool set_parameters(int argc, char *argv[]) {
   // Required NAME D ...
-  if (argc >= 2) {
+  if (argc >= 3) {
     D = atoi(argv[1]);
+    P = atoi(argv[2]);
 
     // Validate possitive value inside variable
-    if (D > 0) {
+    if (D > 0 && P > 0) {
       return true;
     }
   }
@@ -575,7 +578,7 @@ int main(int argc, char **argv) {
 
   // Set program parameters
   if (!set_parameters(argc, argv)) {
-    puts("[ERROR] You should start with NAME D parameters (D greater than zero)");
+    puts("[ERROR] You should start with NAME D P parameters (D and P greater than zero)");
   } else {
     // Parameters setup with success
     if (debug_mode) {
