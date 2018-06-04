@@ -69,6 +69,8 @@ int houseID = -1;
 int *houses_responses_array;
 // Master / slave flag
 bool master = false;
+// Iteration counter
+int iteration = 0;
 
 /*
  * Debug function to show currect state of friend queue
@@ -187,10 +189,11 @@ void want_partner() {
   // Lock, append request, sort, unlock
   pthread_mutex_lock(&partner_mutex);
   partner_queue.push_back(temp);
+  received_friendship_response = 1;
   start_find_partner_time = temp.time;
   pthread_mutex_unlock(&partner_mutex);
   // Broadcast find partner request
-  broadcast(lamport_clock, temp.time, temp.time, TAG_FIND_PARTNER, total_process, myPID);
+  broadcast(lamport_clock, iteration, temp.time, TAG_FIND_PARTNER, total_process, myPID);
   // Wait until receive all confirmations
   while(received_friendship_response < total_process) {
     usleep(1000);
@@ -216,7 +219,7 @@ void want_partner() {
         pthread_mutex_unlock(&partner_mutex);
 
         remove_from_friendship_queue(myPID);
-        broadcast(lamport_clock, partnerID, partnerID, TAG_SELECTED_PARTNER, total_process, myPID);
+        broadcast(lamport_clock, iteration, partnerID, TAG_SELECTED_PARTNER, total_process, myPID);
       } else {
         pthread_mutex_unlock(&partner_mutex);
       }
@@ -227,7 +230,7 @@ void want_partner() {
   }
 
   // Selected partner - go to robbery
-  printf("[%05d][%02d] I have partner! Selected process %02d\n", lamport_clock, myPID, partnerID);
+  printf("[%05d][PID: %02d][IT: %02d] I have partner! Selected process %02d\n", lamport_clock, myPID, iteration, partnerID);
 }
 
 /*
@@ -337,7 +340,7 @@ void *receive_loop(void *thread) {
         // Append request with orignal time to queue
         insert_partner_request(data[2], status.MPI_SOURCE);
         // Send response - note sender about receive message
-        send(lamport_clock, start_find_partner_time, start_find_partner_time, TAG_RESPONSE_PARTNER, status.MPI_SOURCE, myPID);
+        send(lamport_clock, iteration, start_find_partner_time, TAG_RESPONSE_PARTNER, status.MPI_SOURCE, myPID);
 
         // End case TAG_FIND_PARTNER
         break;
@@ -355,7 +358,7 @@ void *receive_loop(void *thread) {
 
       case TAG_SELECTED_PARTNER: {
         // I was chosen!
-        if (data[1] == myPID) {
+        if (data[2] == myPID) {
           // My partner - sender
           master = false;
           partnerID = status.MPI_SOURCE;
@@ -364,7 +367,7 @@ void *receive_loop(void *thread) {
           remove_from_friendship_queue(myPID);
           remove_from_friendship_queue(status.MPI_SOURCE);
           // Broadcast to all process - exit from section
-          broadcast(lamport_clock, myPID, myPID, TAG_SELECTED_PARTNER, total_process, myPID);
+          broadcast(lamport_clock, iteration, myPID, TAG_SELECTED_PARTNER, total_process, myPID);
         } else {
           // Just remove sender's request from queue
           remove_from_friendship_queue(status.MPI_SOURCE);
@@ -490,9 +493,9 @@ void want_house() {
     } while(houseID == -1);
 
     // Selected house to robbery
-    printf("[%05d][%02d] I have house! Selected to robbery %02d\n", lamport_clock, myPID, houseID);
+    printf("[%05d][PID: %02d][IT: %02d] I have house! Selected to robbery %02d\n", lamport_clock, myPID, iteration, houseID);
   } else {
-    printf("[%05d][%02d] Skip requests, %02d should try to access\n", lamport_clock, myPID, partnerID);
+    printf("[%05d][PID: %02d][IT: %02d] Skip requests, %02d should try to access\n", lamport_clock, myPID, iteration, partnerID);
 
     // Wait until master send message about house
     while(houseID == -1) {
@@ -541,13 +544,10 @@ void init_variables() {
   // PartnerID + ACK
   pthread_mutex_lock(&partner_mutex);
   partnerID = -1;
-  received_friendship_response = 1;
-  start_find_partner_time = INT_MAX;
   pthread_mutex_unlock(&partner_mutex);
 
   // ACK in house queues
   pthread_mutex_lock(&houses_array_mutex);
-  start_find_house_time = INT_MAX;
   for (size_t i = 0; i < D; i++) {
     houses_responses_array[i] = 1;
   }
@@ -603,12 +603,12 @@ int main(int argc, char **argv) {
     if (debug_mode) {
       printf("[%05d][%02d][INFO] PROCESS %d READY\n", lamport_clock, myPID, myPID);
     }
-    int iterator = 0;
     MPI_Barrier(MPI_COMM_WORLD);
 
-    while(1) {
-      iterator++;
-      printf("[%05d][%02d] -- CODE RUN -- %d --\n", lamport_clock, myPID, iterator);
+    while(iteration != 1) {
+      iteration++;
+      printf("[%05d][%02d] -- CODE RUN -- %d --\n", lamport_clock, myPID, iteration);
+
       // 1. Init variables
       init_variables();
 
