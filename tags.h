@@ -80,3 +80,10 @@
  */
 #define TAG_RELEASE_SALOON 320
 #endif
+
+#ifndef TAG_IN_SALOON
+/*
+ * TAG for notify partner about enter to saloon
+ */
+#define TAG_IN_SALOON 330
+#endif

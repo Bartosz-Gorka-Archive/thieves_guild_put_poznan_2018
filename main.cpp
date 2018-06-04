@@ -39,9 +39,13 @@ int myPID;
 int total_process;
 // Important parameter to enable correct finish threads - without extra variable can raise errors
 bool run_program = true;
+// Already in saloon
+bool is_in_saloon = false;
 
 // Vector with requests - requests to access to find partner critical section
 std::vector<Request> partner_queue;
+// Vector with requests to access saloon's critical section
+std::vector<Request> saloon_queue;
 // Array with lists of requests to all houses
 std::vector<Request> *houses_vec;
 
@@ -55,16 +59,15 @@ pthread_mutex_t partner_response_mutex = PTHREAD_MUTEX_INITIALIZER;
 std::vector<pthread_mutex_t> houses_mutex;
 // Single mutex for access to table
 pthread_mutex_t houses_array_mutex = PTHREAD_MUTEX_INITIALIZER;
+// Saloon mutex
+pthread_mutex_t saloon_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Number of received ACK to friend find critical section
 // Default 1 - your own ACK ;)
 int received_friendship_response = 1;
+int received_saloon_ack = 1;
 // Partner ID, default -1 to correct check this inside functions
 int partnerID = -1;
-// Start time - clock value in access to partner critical section
-int start_find_partner_time = INT_MAX;
-// Start time - clock value in access to houses critical section
-int start_find_house_time = INT_MAX;
 // Selected house ID
 int houseID = -1;
 // Array with responses (counters) about houses
@@ -185,6 +188,23 @@ void remove_from_friendship_queue(int senderID) {
 }
 
 /*
+ * Remove request from saloon queue.
+ * For secure update - with mutex `saloon_mutex`.
+ * [Warning] In hiden way update `saloon_queue`.
+ * @param int senderID - sender process ID
+ */
+void remove_from_saloon_queue(int senderID) {
+  pthread_mutex_lock(&saloon_mutex);
+  for (size_t i = 0; i < saloon_queue.size(); i++) {
+    if (saloon_queue[i].pid == senderID) {
+      saloon_queue.erase(saloon_queue.begin() + i);
+      break;
+    }
+  }
+  pthread_mutex_unlock(&saloon_mutex);
+}
+
+/*
  * Want partner to robbery.
  */
 void want_partner() {
@@ -193,7 +213,6 @@ void want_partner() {
   pthread_mutex_lock(&partner_mutex);
   partner_queue.push_back(temp);
   received_friendship_response = 1;
-  start_find_partner_time = temp.time;
   pthread_mutex_unlock(&partner_mutex);
   // Broadcast find partner request
   broadcast(lamport_clock, iteration, temp.time, TAG_FIND_PARTNER, total_process, myPID);
@@ -245,6 +264,19 @@ void insert_partner_request(int time, int pid) {
   partner_queue.push_back(Request(time, pid));
   sort_requests(partner_queue);
   pthread_mutex_unlock(&partner_mutex);
+}
+
+/*
+ * Insert new request to saloon vector.
+ * For reduce security issues - also sort requests list
+ * @param int time - Time
+ * @param int pid - Process ID
+ */
+void insert_saloon_request(int time, int pid) {
+  pthread_mutex_lock(&saloon_mutex);
+  saloon_queue.push_back(Request(time, pid));
+  sort_requests(saloon_queue);
+  pthread_mutex_unlock(&saloon_mutex);
 }
 
 /*
@@ -341,7 +373,7 @@ void *receive_loop(void *thread) {
         // Append request with orignal time to queue
         insert_partner_request(data[2], status.MPI_SOURCE);
         // Send response - note sender about receive message
-        send(lamport_clock, iteration, start_find_partner_time, TAG_RESPONSE_PARTNER, status.MPI_SOURCE, myPID);
+        send(lamport_clock, iteration, myPID, TAG_RESPONSE_PARTNER, status.MPI_SOURCE, myPID);
 
         // End case TAG_FIND_PARTNER
         break;
@@ -382,7 +414,7 @@ void *receive_loop(void *thread) {
         // Append request with orignal time to queue
         insert_bulk_house_request(data[2], status.MPI_SOURCE);
         // Send response - note sender about receive message
-        send(lamport_clock, start_find_house_time, start_find_house_time, TAG_RESPONSE_HOUSE, status.MPI_SOURCE, myPID);
+        send(lamport_clock, myPID, myPID, TAG_RESPONSE_HOUSE, status.MPI_SOURCE, myPID);
 
         // End case TAG_HOUSE_REQUEST
         break;
@@ -420,6 +452,43 @@ void *receive_loop(void *thread) {
         break;
       }
 
+      case TAG_ENTER_SALOON: {
+        insert_saloon_request(data[2], status.MPI_SOURCE);
+        send(lamport_clock, iteration, myPID, TAG_CONFIRM_SALOON, status.MPI_SOURCE, myPID);
+
+        // End case TAG_ENTER_SALOON
+        break;
+      }
+
+      case TAG_CONFIRM_SALOON: {
+        pthread_mutex_lock(&saloon_mutex);
+        received_saloon_ack++;
+        pthread_mutex_unlock(&saloon_mutex);
+
+        // End case TAG_CONFIRM_SALOON
+        break;
+      }
+
+      case TAG_RELEASE_SALOON: {
+        remove_from_saloon_queue(status.MPI_SOURCE);
+
+        if (status.MPI_SOURCE == partnerID) {
+          is_in_saloon = false;
+        }
+
+        // End case TAG_RELEASE_SALOON
+        break;
+      }
+
+      case TAG_IN_SALOON: {
+        if (status.MPI_SOURCE == partnerID) {
+          is_in_saloon = true;
+        }
+
+        // End case TAG_IN_SALOON
+        break;
+      }
+
       default: {
         // Default - raise error because received not supported TAG inside message
         printf("[%05d][%02d][ERROR] Invalid tag '%d' from process %d.\n", lamport_clock, myPID, status.MPI_TAG, status.MPI_SOURCE);
@@ -442,7 +511,6 @@ void want_house() {
     for (int i = 0; i < D; i++) {
       pthread_mutex_lock(&houses_mutex[i]);
       houses_vec[i].push_back(temp);
-      start_find_house_time = temp.time;
       sort_requests(houses_vec[i]);
       pthread_mutex_unlock(&houses_mutex[i]);
     }
@@ -462,7 +530,9 @@ void want_house() {
       pthread_mutex_unlock(&houses_array_mutex);
     } while(wait);
 
-    printf("[%05d][%02d] Received all messages in one of house queue\n", lamport_clock, myPID);
+    if (debug_mode) {
+      printf("[%05d][%02d] Received all messages in one of house queue\n", lamport_clock, myPID);
+    }
 
     // For security also again sort vectors
     for (int i = 0; i < D; i++) {
@@ -477,7 +547,9 @@ void want_house() {
       pthread_mutex_lock(&houses_array_mutex);
       for (int i = 0; i < D; i++) {
         if(houses_responses_array[i] == total_process && check_position(houses_mutex[i], houses_vec[i], myPID) == 0) {
-          printf("[%05d][%02d] Can full access to %d house\n", lamport_clock, myPID, i);
+          if (debug_mode) {
+            printf("[%05d][%02d] Can full access to %02d house\n", lamport_clock, myPID, i);
+          }
           houseID = i;
           notSelected = false;
           remove_from_houses_queues(i, myPID);
@@ -558,12 +630,76 @@ void init_variables() {
   houseID = -1;
 }
 
+/*
+ * Access to saloon with partner
+ */
 void want_saloon() {
-  // TODO
+  // Only master send request to access saloon
+  if (master) {
+    Request temp = Request(lamport_clock, myPID);
+    // Lock, append request, sort, unlock
+    pthread_mutex_lock(&saloon_mutex);
+    saloon_queue.push_back(temp);
+    received_saloon_ack = 1;
+    pthread_mutex_unlock(&saloon_mutex);
+    // Broadcast access to saloon request
+    broadcast(lamport_clock, iteration, temp.time, TAG_ENTER_SALOON, total_process, myPID);
+    // Wait until receive all confirmations
+    while(received_saloon_ack < total_process) {
+      usleep(1000);
+    }
+
+    if (debug_mode) {
+      printf("[%05d][%02d] Received all messages (saloon access)\n", lamport_clock, myPID);
+    }
+
+    // Sort requests
+    pthread_mutex_lock(&saloon_mutex);
+    sort_requests(saloon_queue);
+    pthread_mutex_unlock(&saloon_mutex);
+    int current_position = INT_MAX;
+
+    while(!is_in_saloon) {
+      // Calculate total process inside saloon and check can access
+      current_position = 2 * (check_position(saloon_mutex, saloon_queue, myPID) + 1);
+      if (current_position <= P) {
+        // Note partner about enter to saloon
+        is_in_saloon = true;
+        send(lamport_clock, iteration, partnerID, TAG_IN_SALOON, partnerID, myPID);
+      } else {
+        sleep(1);
+      }
+    }
+
+    // Can access to saloon
+    printf("[%05d][PID: %02d][IT: %02d] I can access to saloon with %02d\n", lamport_clock, myPID, iteration, partnerID);
+  } else {
+    // As slave - we ignore send and wait until receive note from master
+    printf("[%05d][PID: %02d][IT: %02d] Skip saloon request, %02d should try to access\n", lamport_clock, myPID, iteration, partnerID);
+
+    // Wait until master send message about saloon
+    while(!is_in_saloon) {
+      sleep(1);
+      printf("[%05d][%02d] Slave sleep - wait saloon access granted\n", lamport_clock, myPID);
+    }
+  }
 }
 
+/*
+ * Fill papers about access to house.
+ * After sleep random time, master send release message in broadcast.
+ */
 void fill_papers() {
-  // TODO
+  int sleep_time = (rand() % 10) + 2;
+  printf("[%05d][%02d] Fill papers [%02d seconds]\n", lamport_clock, myPID, sleep_time);
+  sleep(sleep_time);
+  printf("[%05d][%02d] Papers ready\n", lamport_clock, myPID);
+
+  // If master - send release from saloon critical section
+  if (master) {
+    remove_from_saloon_queue(myPID);
+    broadcast(lamport_clock, iteration, partnerID, TAG_RELEASE_SALOON, total_process, myPID);
+  }
 }
 
 /*
