@@ -67,6 +67,8 @@ int start_find_house_time = INT_MAX;
 int houseID = -1;
 // Array with responses (counters) about houses
 int *houses_responses_array;
+// Master / slave flag
+bool master = false;
 
 /*
  * Debug function to show currect state of friend queue
@@ -208,6 +210,8 @@ void want_partner() {
       pthread_mutex_lock(&partner_mutex);
       // On list my process and someone else
       if (partner_queue.size() >= 1) {
+        // Set master status and select partner
+        master = true;
         partnerID = partner_queue[1].pid;
         pthread_mutex_unlock(&partner_mutex);
 
@@ -353,6 +357,7 @@ void *receive_loop(void *thread) {
         // I was chosen!
         if (data[1] == myPID) {
           // My partner - sender
+          master = false;
           partnerID = status.MPI_SOURCE;
 
           // Remove his request and my request from queue
@@ -426,8 +431,8 @@ void *receive_loop(void *thread) {
  * Want access to house
  */
 void want_house() {
-  // Lower PID can access to critical sections
-  if (myPID < partnerID) {
+  // Master can access to critical sections
+  if (master) {
     Request temp = Request(lamport_clock, myPID);
     // Lock, append request, sort, unlock
     for (size_t i = 0; i < D; i++) {
@@ -513,8 +518,8 @@ void robbery() {
  * Release assigned resource (house) + in hidden also partner
  */
 void release_resources() {
-  // Lower PID can access to critical sections
-  if (myPID < partnerID) {
+  // Master can access to critical sections
+  if (master) {
     // We must send to slave message and exit critical section for houseID
     int lastHouseID = houseID;
     houseID = -1;
