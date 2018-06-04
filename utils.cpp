@@ -10,6 +10,7 @@
  *  Bartosz Górka index. 127228 (@bartoszgorka)
  */
 
+#include <algorithm>
 #include <vector>
 #include "utils.h"
 
