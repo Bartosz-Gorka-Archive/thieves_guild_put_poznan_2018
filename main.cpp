@@ -300,6 +300,22 @@ void remove_from_houses_queues(int selectedHouseID, int senderID) {
 }
 
 /*
+ * Remove request from single house queue
+ * @param int selectedHouseID - House ID (queue ID)
+ * @param int senderID - Sender process ID
+ */
+void remove_from_single_house_queues(int selectedHouseID, int senderID) {
+  pthread_mutex_lock(&houses_mutex[selectedHouseID]);
+  for (size_t j = 0; j < houses_vec[selectedHouseID].size(); j++) {
+    if (houses_vec[selectedHouseID][j].pid == senderID) {
+      houses_vec[selectedHouseID].erase(houses_vec[selectedHouseID].begin() + j);
+      break;
+    }
+  }
+  pthread_mutex_unlock(&houses_mutex[selectedHouseID]);
+}
+
+/*
  * Function to MPI thread - create monitor process to receive messages in loop and update process state.
  */
 void *receive_loop(void *thread) {
@@ -382,6 +398,19 @@ void *receive_loop(void *thread) {
         break;
       }
 
+      case TAG_HOUSE_EXIT: {
+        // Message from my partner (master) - release house
+        if (status.MPI_SOURCE == partnerID) {
+          houseID = -1;
+        }
+
+        // Remove request
+        remove_from_single_house_queues(data[1], status.MPI_SOURCE);
+
+        // End case TAG_HOUSE_EXIT
+        break;
+      }
+
       default: {
         // Default - raise error because received not supported TAG inside message
         printf("[%05d][%02d][ERROR] Invalid tag '%d' from process %d.\n", lamport_clock, myPID, status.MPI_TAG, status.MPI_SOURCE);
@@ -439,7 +468,7 @@ void want_house() {
       pthread_mutex_lock(&houses_array_mutex);
       for (size_t i = 0; i < D; i++) {
         if(houses_responses_array[i] == total_process && check_position(houses_mutex[i], houses_vec[i], myPID) == 0) {
-          printf("[%05d][%02d] Can full access to %d house\n", lamport_clock, myPID, i);
+          printf("[%05d][%02d] Can full access to %lu house\n", lamport_clock, myPID, i);
           houseID = i;
           notSelected = false;
           remove_from_houses_queues(i, myPID);
@@ -468,6 +497,9 @@ void want_house() {
   }
 }
 
+/*
+ * Message + sleep - visit house
+ */
 void robbery() {
   // Show message
   printf("[%05d][%02d] With %02d visit house %d\n", lamport_clock, myPID, partnerID, houseID);
@@ -477,11 +509,56 @@ void robbery() {
   sleep(sleep_time);
 }
 
+/*
+ * Release assigned resource (house) + in hidden also partner
+ */
 void release_resources() {
-  // TODO
+  // Lower PID can access to critical sections
+  if (myPID < partnerID) {
+    // We must send to slave message and exit critical section for houseID
+    int lastHouseID = houseID;
+    houseID = -1;
+    broadcast(lamport_clock, lastHouseID, lastHouseID, TAG_HOUSE_EXIT, total_process, myPID);
+    printf("\t[%05d][%02d] Release %02d house\n", lamport_clock, myPID, lastHouseID);
+  } else {
+    // We wait until master send release house
+    while(houseID != -1) {
+      sleep(1);
+      printf("\t[%02d] Wait until Master %02d send me goodbye\n", myPID, partnerID);
+    }
+  }
 }
 
-int main(int argc,char **argv) {
+/*
+ * Set variables to enable run in while loop
+ */
+void init_variables() {
+  // PartnerID + ACK
+  pthread_mutex_lock(&partner_mutex);
+  partnerID = -1;
+  received_friendship_response = 1;
+  start_find_partner_time = INT_MAX;
+  pthread_mutex_unlock(&partner_mutex);
+
+  // ACK in house queues
+  pthread_mutex_lock(&houses_array_mutex);
+  start_find_house_time = INT_MAX;
+  for (size_t i = 0; i < D; i++) {
+    houses_responses_array[i] = 1;
+  }
+  pthread_mutex_unlock(&houses_array_mutex);
+
+  // Release house
+  houseID = -1;
+}
+
+/*
+ * Main function to run Thieves' Guild code
+ * @param int argc - Total number of parameters
+ * @param char *argc[] - List with parameters
+ * @return int status - action status, 0 => success, else error
+ */
+int main(int argc, char **argv) {
   // stdout - disable bufforing
   setbuf(stdout, NULL);
 
@@ -521,21 +598,27 @@ int main(int argc,char **argv) {
     if (debug_mode) {
       printf("[%05d][%02d][INFO] PROCESS %d READY\n", lamport_clock, myPID, myPID);
     }
+    int iterator = 0;
     MPI_Barrier(MPI_COMM_WORLD);
 
-    // while(1) {
-      // 1. Find partner
+    while(1) {
+      iterator++;
+      printf("[%05d][%02d] -- CODE RUN -- %d --\n", lamport_clock, myPID, iterator);
+      // 1. Init variables
+      init_variables();
+
+      // 2. Find partner
       want_partner();
 
-      // 2. Find house to robbery
+      // 3. Find house to robbery
       want_house();
 
-      // 3. Robbery
+      // 4. Robbery
       robbery();
 
-      // 4. Release all resource
+      // 5. Release all resource
       release_resources();
-    // }
+    }
 
     // Set end calculations
     run_program = false;

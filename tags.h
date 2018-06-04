@@ -52,3 +52,10 @@
  */
 #define TAG_SELECT_HOUSE 220
 #endif
+
+#ifndef TAG_HOUSE_EXIT
+/*
+ * TAG for exit from last selected house
+ */
+#define TAG_HOUSE_EXIT 250
+#endif
