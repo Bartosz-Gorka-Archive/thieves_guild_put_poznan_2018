@@ -95,8 +95,8 @@ void show_friend_queue() {
 
 void show_houses_to_release_queue() {
   pthread_mutex_lock(&houses_to_return_mutex);
-  for (size_t i = 0; i < houses_to_return_list.size(); i++) {
-    printf("\t [%d] %lu => %d\n", myPID, i+1, houses_to_return_list[i]);
+  for (int i = 0; i < houses_to_return_list.size(); i++) {
+    printf("\t [%d] %d => %d\n", myPID, i+1, houses_to_return_list[i]);
   }
   pthread_mutex_unlock(&houses_to_return_mutex);
 }
@@ -513,15 +513,15 @@ void want_house() {
     pthread_mutex_lock(&houses_to_return_mutex);
     for (int i = 0; i < D; i++) {
       if(!checkAlreadyHasHouse(i)) {
-        Request temp = Request(lamport_clock, myPID);
+        Request tempRequestHouse = Request(lamport_clock, myPID);
         // Lock, append request, sort, unlock
         pthread_mutex_lock(&houses_mutex[i]);
-        houses_vec[i].push_back(temp);
+        houses_vec[i].push_back(tempRequestHouse);
         sort_requests(houses_vec[i]);
         pthread_mutex_unlock(&houses_mutex[i]);
 
         // Broadcast find available house
-        broadcast(lamport_clock, i, temp.time, TAG_HOUSE_REQUEST, total_process, myPID);
+        broadcast(lamport_clock, i, tempRequestHouse.time, TAG_HOUSE_REQUEST, total_process, myPID);
       }
     }
     pthread_mutex_unlock(&houses_to_return_mutex);
@@ -556,7 +556,9 @@ void want_house() {
     do {
       pthread_mutex_lock(&houses_array_mutex);
       for (int i = 0; i < D; i++) {
-        if(houses_responses_array[i] == total_process && check_position(houses_mutex[i], houses_vec[i], myPID) == 0) {
+        printf("%d => %d %d %d\n", myPID, houses_responses_array[i], !checkAlreadyHasHouse(i), check_position(houses_mutex[i], houses_vec[i], myPID));
+        show_houses_to_release_queue();
+        if(houses_responses_array[i] == total_process && !checkAlreadyHasHouse(i) && check_position(houses_mutex[i], houses_vec[i], myPID) == 0) {
           if (debug_mode) {
             printf("[%05d][%02d] Can full access to %02d house\n", lamport_clock, myPID, i);
           }
@@ -565,6 +567,7 @@ void want_house() {
 
           for (int k = 0; k < D; k++) {
             if(i != k && !checkAlreadyHasHouse(k)) {
+              remove_from_single_house_queues(k, myPID);
               broadcast(lamport_clock, k, k, TAG_HOUSE_EXIT, total_process, myPID);
             }
           }
