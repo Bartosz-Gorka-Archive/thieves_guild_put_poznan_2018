@@ -1,0 +1,270 @@
+D => 6
+P => 2
+Z => 2
+
+[00000][00] -- CODE RUN -- ITERATION 01 --
+[00000][01] -- CODE RUN -- ITERATION 01 --
+[00004][01] Received all messages
+[00005][PID: 01][IT: 01] I have partner! Selected process 00
+[00019][00] Received all messages
+[00019][PID: 00][IT: 01] I have partner! Selected process 01
+[00019][PID: 00][IT: 01] Skip requests, 01 should try to access
+[00026][PID: 01][IT: 01] I have house! Selected to robbery 00
+[00032][PID: 00][IT: 01] Slave sleep - wait house assign
+[00032][PID: 00][IT: 01] Skip saloon request, 01 should try to access
+[00033][00] Fill papers [02 seconds]
+[00034][PID: 01][IT: 01] I can access to saloon with 00
+[00034][01] Fill papers [06 seconds]
+[00033][00] Papers ready
+[00035][01] Papers ready
+[00035][01] Exit from saloon
+[00036][01] With 00 visit house 0
+[00036][01] -- ROBBERY -- [02 seconds]
+[00037][00] With 01 visit house 0
+[00037][00] -- ROBBERY -- [04 seconds]
+[00039][00] -- CODE RUN -- ITERATION 02 --
+[00040][01] Exit from partnership with 00
+[00040][01] -- CODE RUN -- ITERATION 02 --
+[00046][01] Received all messages
+[00047][00] Received all messages
+[00048][PID: 00][IT: 02] I have partner! Selected process 01
+[00069][PID: 00][IT: 02] I have house! Selected to robbery 01
+[00075][PID: 01][IT: 02] I have partner! Selected process 00
+[00075][PID: 01][IT: 02] Skip requests, 00 should try to access
+[00075][PID: 01][IT: 02] Skip saloon request, 00 should try to access
+[00076][01] Fill papers [05 seconds]
+[00077][PID: 00][IT: 02] I can access to saloon with 01
+[00077][00] Fill papers [02 seconds]
+[00077][00] Papers ready
+[00077][00] Exit from saloon
+[00079][01] Papers ready
+[00080][01] With 00 visit house 1
+[00080][01] -- ROBBERY -- [03 seconds]
+[00081][00] With 01 visit house 1
+[00081][00] -- ROBBERY -- [01 seconds]
+[00084][01] -- CODE RUN -- ITERATION 03 --
+[00087][00] Exit from partnership with 01
+[00087][00] -- CODE RUN -- ITERATION 03 --
+[00090][01] Received all messages
+[00091][00] Received all messages
+[00092][PID: 00][IT: 03] I have partner! Selected process 01
+[00110][PID: 00][IT: 03] I have house! Selected to robbery 02
+[00116][PID: 01][IT: 03] I have partner! Selected process 00
+[00116][PID: 01][IT: 03] Skip requests, 00 should try to access
+[00116][PID: 01][IT: 03] Skip saloon request, 00 should try to access
+[00117][01] Fill papers [04 seconds]
+[00118][PID: 00][IT: 03] I can access to saloon with 01
+[00118][00] Fill papers [03 seconds]
+[00118][00] Papers ready
+[00118][00] Exit from saloon
+[00120][01] Papers ready
+[00121][01] With 00 visit house 2
+[00121][01] -- ROBBERY -- [01 seconds]
+[00122][00] With 01 visit house 2
+[00122][00] -- ROBBERY -- [02 seconds]
+[00124][00] Exit from partnership with 01
+[00124][00] -- CODE RUN -- ITERATION 04 --
+[00127][01] -- CODE RUN -- ITERATION 04 --
+[00130][00] Received all messages
+[00131][01] Received all messages
+[00132][PID: 01][IT: 04] I have partner! Selected process 00
+[00150][PID: 01][IT: 04] I have house! Selected to robbery 03
+[00156][PID: 00][IT: 04] I have partner! Selected process 01
+[00156][PID: 00][IT: 04] Skip requests, 01 should try to access
+[00156][PID: 00][IT: 04] Skip saloon request, 01 should try to access
+[00157][00] Fill papers [02 seconds]
+[00158][PID: 01][IT: 04] I can access to saloon with 00
+[00158][01] Fill papers [05 seconds]
+[00157][00] Papers ready
+[00159][01] Papers ready
+[00159][01] Exit from saloon
+[00160][01] With 00 visit house 3
+[00160][01] -- ROBBERY -- [04 seconds]
+[00161][00] With 01 visit house 3
+[00161][00] -- ROBBERY -- [02 seconds]
+[00164][01] Exit from partnership with 00
+[00164][01] -- CODE RUN -- ITERATION 05 --
+[00167][00] -- CODE RUN -- ITERATION 05 --
+[00170][01] Received all messages
+[00171][00] Received all messages
+[00172][PID: 00][IT: 05] I have partner! Selected process 01
+[00189][PID: 00][IT: 05] I have house! Selected to robbery 04
+[00195][PID: 01][IT: 05] I have partner! Selected process 00
+[00195][PID: 01][IT: 05] Skip requests, 00 should try to access
+[00195][PID: 01][IT: 05] Skip saloon request, 00 should try to access
+[00196][01] Fill papers [06 seconds]
+[00197][PID: 00][IT: 05] I can access to saloon with 01
+[00197][00] Fill papers [05 seconds]
+[00197][00] Papers ready
+[00197][00] Exit from saloon
+[00196][01] Papers ready
+[00199][00] With 01 visit house 4
+[00199][00] -- ROBBERY -- [02 seconds]
+[00199][01] With 00 visit house 4
+[00199][01] -- ROBBERY -- [01 seconds]
+[00202][00] Exit from partnership with 01
+[00202][00] -- CODE RUN -- ITERATION 06 --
+[00206][00] Received all messages
+[00205][01] -- CODE RUN -- ITERATION 06 --
+[00209][01] Received all messages
+[00210][PID: 01][IT: 06] I have partner! Selected process 00
+[00225][PID: 01][IT: 06] I have house! Selected to robbery 05
+[00231][PID: 00][IT: 06] I have partner! Selected process 01
+[00231][PID: 00][IT: 06] Skip requests, 01 should try to access
+[00231][PID: 00][IT: 06] Skip saloon request, 01 should try to access
+[00232][00] Fill papers [06 seconds]
+[00233][PID: 01][IT: 06] I can access to saloon with 00
+[00233][01] Fill papers [02 seconds]
+[00233][01] Papers ready
+[00233][01] Exit from saloon
+[00235][00] Papers ready
+[00236][00] With 01 visit house 5
+[00236][00] -- ROBBERY -- [01 seconds]
+[00237][01] With 00 visit house 5
+[00237][01] -- ROBBERY -- [01 seconds]
+[00239][00] -- CODE RUN -- ITERATION 07 --
+[00239][01] Exit from partnership with 00
+[00242][01] -- CODE RUN -- ITERATION 07 --
+[00245][00] Received all messages
+[00246][01] Received all messages
+[00247][PID: 01][IT: 07] I have partner! Selected process 00
+[00255][PID: 00][IT: 07] I have partner! Selected process 01
+[00255][PID: 00][IT: 07] Skip requests, 01 should try to access
+[00256][01] Master can't access house
+[00255][PID: 00][IT: 07] Slave sleep - wait house assign
+[00256][01] Master can't access house
+[00255][PID: 00][IT: 07] Slave sleep - wait house assign
+[00256][01] Master can't access house
+[00255][PID: 00][IT: 07] Slave sleep - wait house assign
+[00256][01] Master can't access house
+[00255][PID: 00][IT: 07] Slave sleep - wait house assign
+[00256][01] Master can't access house
+[00255][PID: 00][IT: 07] Slave sleep - wait house assign
+[00256][01] Master can't access house
+[00256][01] Master can't access house
+[00255][PID: 00][IT: 07] Slave sleep - wait house assign
+[00255][PID: 00][IT: 07] Slave sleep - wait house assign
+[00256][01] Master can't access house
+[00255][PID: 00][IT: 07] Slave sleep - wait house assign
+[00256][01] Master can't access house
+[00255][PID: 00][IT: 07] Slave sleep - wait house assign
+[00256][01] Master can't access house
+[00255][PID: 00][IT: 07] Slave sleep - wait house assign
+[00256][01] Master can't access house
+	 [00] 01 => 01
+	 [00] 02 => 02
+	 [00] 03 => 04
+[00255][00] -- RELEASE HOUSE 01 --
+	 [00] 01 => 02
+	 [00] 02 => 04
+	 [01] 01 => 00
+	 [01] 02 => 03
+	 [01] 03 => 05
+[00256][01] -- RELEASE HOUSE 00 --
+	 [01] 01 => 03
+	 [01] 02 => 05
+[00258][PID: 00][IT: 07] Slave sleep - wait house assign
+[00258][01] Master can't access house
+[00262][PID: 01][IT: 07] I have house! Selected to robbery 01
+[00268][PID: 00][IT: 07] Slave sleep - wait house assign
+[00268][PID: 00][IT: 07] Skip saloon request, 01 should try to access
+[00269][00] Fill papers [03 seconds]
+[00270][PID: 01][IT: 07] I can access to saloon with 00
+[00270][01] Fill papers [04 seconds]
+[00269][00] Papers ready
+[00271][01] Papers ready
+[00271][01] Exit from saloon
+[00272][01] With 00 visit house 1
+[00272][01] -- ROBBERY -- [04 seconds]
+[00273][00] With 01 visit house 1
+[00273][00] -- ROBBERY -- [03 seconds]
+[00276][01] Exit from partnership with 00
+[00276][01] -- CODE RUN -- ITERATION 08 --
+[00279][00] -- CODE RUN -- ITERATION 08 --
+[00282][01] Received all messages
+[00283][00] Received all messages
+[00284][PID: 00][IT: 08] I have partner! Selected process 01
+[00299][PID: 00][IT: 08] I have house! Selected to robbery 00
+[00305][PID: 01][IT: 08] I have partner! Selected process 00
+[00305][PID: 01][IT: 08] Skip requests, 00 should try to access
+[00305][PID: 01][IT: 08] Skip saloon request, 00 should try to access
+[00306][01] Fill papers [04 seconds]
+[00307][PID: 00][IT: 08] I can access to saloon with 01
+[00307][00] Fill papers [05 seconds]
+[00306][01] Papers ready
+[00308][00] Papers ready
+[00308][00] Exit from saloon
+[00309][00] With 01 visit house 0
+[00309][00] -- ROBBERY -- [04 seconds]
+[00310][01] With 00 visit house 0
+[00310][01] -- ROBBERY -- [02 seconds]
+[00313][00] Exit from partnership with 01
+[00313][00] -- CODE RUN -- ITERATION 09 --
+[00316][01] -- CODE RUN -- ITERATION 09 --
+[00319][00] Received all messages
+[00320][01] Received all messages
+[00321][PID: 01][IT: 09] I have partner! Selected process 00
+[00329][PID: 00][IT: 09] I have partner! Selected process 01
+[00329][PID: 00][IT: 09] Skip requests, 01 should try to access
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00330][01] Master can't access house
+[00330][01] Master can't access house
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
+[00329][PID: 00][IT: 09] Slave sleep - wait house assign
