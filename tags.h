@@ -88,9 +88,9 @@
 #define TAG_RELEASE_SALOON 320
 #endif
 
-#ifndef TAG_IN_SALOON
+#ifndef TAG_SYNCHRONIZE_PARTNER
 /*
- * TAG for notify partner about enter to saloon
+ * TAG for synchronize partners
  */
-#define TAG_IN_SALOON 330
+#define TAG_SYNCHRONIZE_PARTNER 500
 #endif
